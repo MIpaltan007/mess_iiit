@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button'; // Added import for Button
+import { Button } from '@/components/ui/button';
 import { Carrot, Leaf, Fish, WheatOff } from 'lucide-react'; // Example icons
 
 interface MenuItem {
@@ -32,7 +32,22 @@ const initialMenuData: MenuItem[] = [
   { id: '7', day: 'Wednesday', mealType: 'Breakfast', name: 'Pancakes', description: 'Fluffy pancakes with maple syrup.', dietaryTags: ['Vegetarian'], calories: 450, price: 6.00 },
   { id: '8', day: 'Wednesday', mealType: 'Lunch', name: 'Vegetable Stir-fry', description: 'Mixed vegetables stir-fried with tofu and soy sauce.', dietaryTags: ['Vegan', 'Vegetarian'], calories: 500, price: 8.50 },
   { id: '9', day: 'Wednesday', mealType: 'Dinner', name: 'Spaghetti Bolognese', description: 'Classic spaghetti with a rich meat sauce.', dietaryTags: ['Non-Veg'], calories: 650, price: 9.00 },
-  // Add more items for other days and meals
+  // Thursday
+  { id: '10', day: 'Thursday', mealType: 'Breakfast', name: 'Yogurt Parfait', description: 'Greek yogurt with granola and fresh fruits.', dietaryTags: ['Vegetarian'], calories: 320, price: 5.50 },
+  { id: '11', day: 'Thursday', mealType: 'Lunch', name: 'Turkey Club Sandwich', description: 'Triple-decker sandwich with turkey, bacon, lettuce, and tomato.', dietaryTags: ['Non-Veg'], calories: 600, price: 9.00 },
+  { id: '12', day: 'Thursday', mealType: 'Dinner', name: 'Beef Tacos', description: 'Seasoned ground beef in crispy taco shells with toppings.', dietaryTags: ['Non-Veg'], calories: 550, price: 8.50 },
+  // Friday
+  { id: '13', day: 'Friday', mealType: 'Breakfast', name: 'Smoothie Bowl', description: 'Blended açai with banana, berries, and coconut flakes.', dietaryTags: ['Vegan', 'Vegetarian', 'Gluten-Free'], calories: 380, price: 6.50 },
+  { id: '14', day: 'Friday', mealType: 'Lunch', name: 'Fish and Chips', description: 'Battered cod fillets with a side of crispy fries.', dietaryTags: ['Non-Veg'], calories: 700, price: 10.50 },
+  { id: '15', day: 'Friday', mealType: 'Dinner', name: 'Margherita Pizza', description: 'Classic pizza with tomatoes, mozzarella, and basil.', dietaryTags: ['Vegetarian'], calories: 620, price: 9.50 },
+  // Saturday
+  { id: '16', day: 'Saturday', mealType: 'Breakfast', name: 'Waffles with Syrup', description: 'Crispy Belgian waffles served with butter and maple syrup.', dietaryTags: ['Vegetarian'], calories: 480, price: 7.00 },
+  { id: '17', day: 'Saturday', mealType: 'Lunch', name: 'BBQ Pulled Pork Sandwich', description: 'Slow-cooked pulled pork in BBQ sauce on a brioche bun.', dietaryTags: ['Non-Veg'], calories: 650, price: 9.50 },
+  { id: '18', day: 'Saturday', mealType: 'Dinner', name: 'Chicken Alfredo', description: 'Creamy Alfredo pasta with grilled chicken breast.', dietaryTags: ['Non-Veg'], calories: 720, price: 11.00 },
+  // Sunday
+  { id: '19', day: 'Sunday', mealType: 'Breakfast', name: 'French Toast', description: 'Thick-cut bread dipped in egg batter, served with berries.', dietaryTags: ['Vegetarian'], calories: 420, price: 6.50 },
+  { id: '20', day: 'Sunday', mealType: 'Lunch', name: 'Roast Chicken with Vegetables', description: 'Herb-roasted chicken with seasonal vegetables.', dietaryTags: ['Non-Veg', 'Gluten-Free'], calories: 600, price: 10.00 },
+  { id: '21', day: 'Sunday', mealType: 'Dinner', name: 'Shepherd\'s Pie', description: 'Ground lamb and vegetables topped with mashed potatoes.', dietaryTags: ['Non-Veg'], calories: 680, price: 9.50 },
 ];
 
 
@@ -43,6 +58,8 @@ const dietaryTagIcons: Record<DietaryTag, React.ReactElement> = {
   'Non-Veg': <Fish className="h-4 w-4 text-blue-500" />,
 };
 
+const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
 export const MenuDisplay: FC = () => {
   const [menuData, setMenuData] = useState<MenuItem[]>([]);
   const [filter, setFilter] = useState<DietaryTag | 'All'>('All');
@@ -52,8 +69,6 @@ export const MenuDisplay: FC = () => {
     // Simulate fetching data
     setMenuData(initialMenuData);
   }, []);
-
-  const daysOfWeek = useMemo(() => Array.from(new Set(menuData.map(item => item.day))), [menuData]);
 
   const filteredMenu = useMemo(() => {
     return menuData
@@ -121,7 +136,7 @@ export const MenuDisplay: FC = () => {
                   <TableCell>{item.name}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{item.description}</TableCell>
                   <TableCell>
-                    <div className="flex gap-1">
+                    <div className="flex gap-1 flex-wrap">
                       {item.dietaryTags.map(tag => (
                         <Badge key={tag} variant="secondary" className="flex items-center gap-1 capitalize">
                           {dietaryTagIcons[tag]}
