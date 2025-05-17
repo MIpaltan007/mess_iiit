@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BarChart, Users, ShoppingBag, Utensils, Bell, LogOut, Settings, FileText, QrCode, AlertCircle } from "lucide-react";
+import { BarChart, Users, ShoppingBag, Utensils, Bell, LogOut, Settings, FileText, QrCode, AlertCircle, DollarSign, Package, Activity } from "lucide-react";
 import {
   ChartContainer,
   ChartTooltip,
@@ -17,41 +17,31 @@ import {
 } from "@/components/ui/chart";
 import { Bar, CartesianGrid, XAxis, YAxis, BarChart as RechartsBarChart, ResponsiveContainer, Tooltip as RechartsTooltip } from "recharts";
 import { getTotalUsersCount, getRecentUsers, type User as UserData } from "@/services/userService";
+import { getDashboardData, type DashboardStats, type SalesChartDataItem, type RecentSaleRecord } from "@/services/adminDashboardService";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export const dynamic = 'force-dynamic'; // Opt into dynamic rendering
 
-const chartData = [
-  { month: "January", desktop: 186, mobile: 80 },
-  { month: "February", desktop: 305, mobile: 200 },
-  { month: "March", desktop: 237, mobile: 120 },
-  { month: "April", desktop: 73, mobile: 190 },
-  { month: "May", desktop: 209, mobile: 130 },
-  { month: "June", desktop: 214, mobile: 140 },
-];
-
-const chartConfig = {
-  desktop: {
-    label: "Desktop",
+const initialChartConfig = {
+  sales: {
+    label: "Sales",
     color: "hsl(var(--chart-1))",
   },
-  mobile: {
-    label: "Mobile",
-    color: "hsl(var(--chart-2))",
-  },
 };
-
-const mockRecentSales = [
-    { id: "S001", user: "Alice Smith", plan: "Full Feast", amount: 90.00, date: "2024-07-20" },
-    { id: "S002", user: "David Brown", plan: "Daily Delights", amount: 65.00, date: "2024-07-19" },
-    { id: "S003", user: "Eve Davis", plan: "Full Feast", amount: 90.00, date: "2024-07-19" },
-];
 
 export default function AdminDashboardPage() {
   const [totalUsers, setTotalUsers] = useState<number | null>(null);
   const [recentUsers, setRecentUsers] = useState<UserData[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [usersError, setUsersError] = useState<string | null>(null);
+
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
+  const [salesChartData, setSalesChartData] = useState<SalesChartDataItem[]>([]);
+  const [recentSales, setRecentSales] = useState<RecentSaleRecord[]>([]);
+  const [isLoadingDashboardData, setIsLoadingDashboardData] = useState(true);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
+  const [chartConfig, setChartConfig] = useState(initialChartConfig);
+
 
   useEffect(() => {
     async function fetchUsersData() {
@@ -60,16 +50,35 @@ export default function AdminDashboardPage() {
       try {
         const count = await getTotalUsersCount();
         setTotalUsers(count);
-        const users = await getRecentUsers(3); // Fetch 3 recent users for the dashboard
+        const users = await getRecentUsers(3);
         setRecentUsers(users);
       } catch (error) {
         console.error("Failed to fetch user data:", error);
-        setUsersError("Failed to load user data. Please try again later.");
+        setUsersError("Failed to load user data.");
       } finally {
         setIsLoadingUsers(false);
       }
     }
     fetchUsersData();
+  }, []);
+
+  useEffect(() => {
+    async function fetchDashboardData() {
+      setIsLoadingDashboardData(true);
+      setDashboardError(null);
+      try {
+        const data = await getDashboardData();
+        setDashboardStats(data.stats);
+        setSalesChartData(data.salesChartData);
+        setRecentSales(data.recentSales);
+      } catch (error) {
+        console.error("Failed to fetch dashboard data:", error);
+        setDashboardError("Failed to load dashboard data.");
+      } finally {
+        setIsLoadingDashboardData(false);
+      }
+    }
+    fetchDashboardData();
   }, []);
 
   return (
@@ -151,7 +160,6 @@ export default function AdminDashboardPage() {
               ) : (
                 <>
                   <div className="text-2xl font-bold">{totalUsers}</div>
-                  {/* Placeholder for percentage change */}
                   <p className="text-xs text-muted-foreground">Currently active</p> 
                 </>
               )}
@@ -159,42 +167,77 @@ export default function AdminDashboardPage() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Sales</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+              <DollarSign className="h-5 w-5 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              {isLoadingDashboardData ? (
+                <>
+                  <Skeleton className="h-8 w-1/2 mb-1" />
+                  <Skeleton className="h-4 w-3/4" />
+                </>
+              ) : dashboardError ? (
+                <span className="text-sm text-destructive">{dashboardError.substring(0,25)}...</span>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">₹{dashboardStats?.totalRevenue.toFixed(2) || '0.00'}</div>
+                  <p className="text-xs text-muted-foreground">All time</p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
               <ShoppingBag className="h-5 w-5 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">$45,231.89</div>
-              <p className="text-xs text-muted-foreground">+15.3% from last month</p>
+             {isLoadingDashboardData ? (
+                <>
+                  <Skeleton className="h-8 w-1/2 mb-1" />
+                  <Skeleton className="h-4 w-3/4" />
+                </>
+              ) : dashboardError ? (
+                <span className="text-sm text-destructive">{dashboardError.substring(0,25)}...</span>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">{dashboardStats?.totalOrders || '0'}</div>
+                  <p className="text-xs text-muted-foreground">All time</p>
+                </>
+              )}
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Coupons Sold</CardTitle>
-              <Utensils className="h-5 w-5 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Total Meals Ordered</CardTitle>
+              <Package className="h-5 w-5 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">573</div>
-              <p className="text-xs text-muted-foreground">+10% from last week</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Plans</CardTitle>
-              <BarChart className="h-5 w-5 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">3</div>
-              <p className="text-xs text-muted-foreground">Basic, Daily, Full</p>
+              {isLoadingDashboardData ? (
+                <>
+                  <Skeleton className="h-8 w-1/2 mb-1" />
+                  <Skeleton className="h-4 w-3/4" />
+                </>
+              ) : dashboardError ? (
+                <span className="text-sm text-destructive">{dashboardError.substring(0,25)}...</span>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">{dashboardStats?.totalMealsOrdered || '0'}</div>
+                  <p className="text-xs text-muted-foreground">Across all orders</p>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
         
-        {usersError && (
+        {(usersError || dashboardError) && (
              <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Error Loading User Data</AlertTitle>
+                <AlertTitle>Error Loading Dashboard Data</AlertTitle>
                 <AlertDescription>
-                    {usersError}
+                    {usersError && <p>{usersError}</p>}
+                    {dashboardError && <p>{dashboardError}</p>}
+                    Please try refreshing the page.
                 </AlertDescription>
             </Alert>
         )}
@@ -204,26 +247,35 @@ export default function AdminDashboardPage() {
           <Card className="lg:col-span-1">
             <CardHeader>
               <CardTitle>Sales Trends</CardTitle>
-              <CardDescription>Monthly sales overview (mock data).</CardDescription>
+              <CardDescription>Monthly sales overview.</CardDescription>
             </CardHeader>
             <CardContent className="pl-2">
-              <ChartContainer config={chartConfig} className="h-[300px] w-full">
-                <RechartsBarChart accessibilityLayer data={chartData}>
-                  <CartesianGrid vertical={false} />
-                  <XAxis
-                    dataKey="month"
-                    tickLine={false}
-                    tickMargin={10}
-                    axisLine={false}
-                    tickFormatter={(value) => value.slice(0, 3)}
-                  />
-                  <YAxis />
-                  <RechartsTooltip content={<ChartTooltipContent />} />
-                  <ChartLegend content={<ChartLegendContent />} />
-                  <Bar dataKey="desktop" fill="var(--color-desktop)" radius={4} />
-                  <Bar dataKey="mobile" fill="var(--color-mobile)" radius={4} />
-                </RechartsBarChart>
-              </ChartContainer>
+              {isLoadingDashboardData ? (
+                <Skeleton className="h-[300px] w-full" />
+              ) : dashboardError ? (
+                 <p className="text-sm text-muted-foreground text-center py-4">Could not load sales chart data.</p>
+              ) : salesChartData.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No sales data available to display chart.</p>
+              ) : (
+                <ChartContainer config={chartConfig} className="h-[300px] w-full">
+                  <RechartsBarChart accessibilityLayer data={salesChartData}>
+                    <CartesianGrid vertical={false} />
+                    <XAxis
+                      dataKey="month"
+                      tickLine={false}
+                      tickMargin={10}
+                      axisLine={false}
+                    />
+                    <YAxis />
+                    <RechartsTooltip 
+                        content={<ChartTooltipContent 
+                            formatter={(value) => `₹${Number(value).toFixed(2)}`}
+                        />} 
+                    />
+                    <Bar dataKey="sales" fill="var(--color-sales)" radius={4} />
+                  </RechartsBarChart>
+                </ChartContainer>
+              )}
             </CardContent>
           </Card>
 
@@ -276,30 +328,42 @@ export default function AdminDashboardPage() {
         {/* Recent Sales */}
         <Card>
             <CardHeader>
-              <CardTitle>Recent Sales</CardTitle>
-              <CardDescription>A list of recent meal plan purchases.</CardDescription>
+              <CardTitle>Recent Sales Transactions</CardTitle>
+              <CardDescription>A list of the latest meal plan purchases.</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead>Plan</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead>Date</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {mockRecentSales.map((sale) => (
-                    <TableRow key={sale.id}>
-                      <TableCell>{sale.user}</TableCell>
-                      <TableCell>{sale.plan}</TableCell>
-                      <TableCell className="text-right">${sale.amount.toFixed(2)}</TableCell>
-                      <TableCell>{sale.date}</TableCell>
+            {isLoadingDashboardData ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              ) : dashboardError ? (
+                 <p className="text-sm text-muted-foreground text-center py-4">Could not load recent sales.</p>
+              ) : recentSales.length === 0 && !dashboardError ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No recent sales transactions found.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>User</TableHead>
+                      <TableHead>Items</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead>Date</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {recentSales.map((sale) => (
+                      <TableRow key={sale.id}>
+                        <TableCell>{sale.user}</TableCell>
+                        <TableCell>{sale.itemsSummary}</TableCell>
+                        <TableCell className="text-right">₹{sale.amount.toFixed(2)}</TableCell>
+                        <TableCell>{sale.date}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
 
@@ -307,4 +371,3 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
-
