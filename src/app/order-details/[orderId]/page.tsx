@@ -7,7 +7,7 @@ import { getOrderById, type OrderData } from '@/services/orderService';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, Utensils } from 'lucide-react';
+import { AlertCircle, Utensils, UserCircle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -41,10 +41,12 @@ export default function OrderDetailsPage() {
   if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <Card className="shadow-lg rounded-lg">
+        <Card className="shadow-lg rounded-lg max-w-2xl mx-auto">
           <CardHeader>
-            <Skeleton className="h-8 w-3/4" />
-            <Skeleton className="h-4 w-1/2 mt-2" />
+            <Skeleton className="h-8 w-3/4 mb-2" />
+            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="h-4 w-1/3 mt-1" />
+            <Skeleton className="h-4 w-1/2 mt-1" />
           </CardHeader>
           <CardContent className="space-y-4">
             <Skeleton className="h-6 w-1/4" />
@@ -97,10 +99,11 @@ export default function OrderDetailsPage() {
       <Card className="shadow-lg rounded-lg max-w-2xl mx-auto">
         <CardHeader>
           <CardTitle className="text-2xl font-semibold text-primary">Order Details</CardTitle>
-          <CardDescription>
-            Order ID: {order.id} <br />
-            Placed on: {new Date(order.createdAt.seconds * 1000).toLocaleString()} <br/>
-            User: {order.userEmail}
+          <CardDescription className="space-y-1">
+            <p><strong>Order ID:</strong> {order.id}</p>
+            <p><strong>Placed on:</strong> {new Date(order.createdAt.seconds * 1000).toLocaleString()}</p>
+            {order.userName && <p className="flex items-center gap-1"><strong>User Name:</strong> <UserCircle className="h-4 w-4 text-muted-foreground"/> {order.userName}</p>}
+            <p><strong>User Email:</strong> {order.userEmail}</p>
           </CardDescription>
         </CardHeader>
         <CardContent>

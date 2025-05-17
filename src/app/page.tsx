@@ -109,6 +109,7 @@ export default function Home() {
           <OrderSummary 
             selectedMeals={selectedMeals}
             currentUserEmail={currentUser?.email || null}
+            currentUserDisplayName={currentUser?.displayName || null}
             onPaymentSuccess={handleClearSelections}
           />
         </div>

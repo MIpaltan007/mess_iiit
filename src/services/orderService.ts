@@ -3,28 +3,28 @@
 
 import { Timestamp, addDoc, collection, doc, getDoc } from 'firebase/firestore';
 import type { MenuItem } from '@/components/menu-display';
-import { db } from './firebase'; // Changed import from 'app' to 'db'
+import { db } from './firebase'; 
 
 export interface OrderData {
   id?: string; // Firestore document ID, added after fetching
   userEmail: string;
+  userName?: string; // User's display name
   selectedMeals: MenuItem[];
   totalCost: number;
   createdAt: Timestamp;
 }
 
-// const db = getFirestore(app); // Removed: db is now imported directly
 const ordersCollection = collection(db, 'orders');
 
 /**
  * Saves an order to Firestore.
- * @param orderData - The order details to save.
+ * @param orderData - The order details to save. Includes userEmail, selectedMeals, totalCost, and optionally userName.
  * @returns The ID of the newly created order document.
  */
 export async function saveOrder(orderData: Omit<OrderData, 'id' | 'createdAt'>): Promise<string> {
   try {
     const orderToSave = {
-      ...orderData,
+      ...orderData, // This will include userEmail, selectedMeals, totalCost, and userName if provided
       createdAt: Timestamp.now(),
     };
     const docRef = await addDoc(ordersCollection, orderToSave);
@@ -43,7 +43,7 @@ export async function saveOrder(orderData: Omit<OrderData, 'id' | 'createdAt'>):
 /**
  * Retrieves a specific order from Firestore by its ID.
  * @param orderId - The ID of the order to retrieve.
- * @returns The order data if found, otherwise null.
+ * @returns The order data (including userName if saved) if found, otherwise null.
  */
 export async function getOrderById(orderId: string): Promise<OrderData | null> {
   try {
@@ -55,7 +55,16 @@ export async function getOrderById(orderId: string): Promise<OrderData | null> {
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
-      return { id: docSnap.id, ...docSnap.data() } as OrderData;
+      // Ensure the data conforms to OrderData, especially the optional userName
+      const data = docSnap.data();
+      return { 
+        id: docSnap.id, 
+        userEmail: data.userEmail,
+        userName: data.userName, // This will be undefined if not set, which is fine for optional field
+        selectedMeals: data.selectedMeals,
+        totalCost: data.totalCost,
+        createdAt: data.createdAt,
+      } as OrderData;
     } else {
       console.log(`No order found with ID: ${orderId}`);
       return null;
