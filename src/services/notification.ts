@@ -1,7 +1,8 @@
+
 /**
  * Represents a notification message.
  */
-export interface Notification {
+export interface Notification { // Keep this as Notification, aliased in order-summary
   /**
    * The recipient of the notification.
    */
@@ -38,9 +39,16 @@ export interface NotificationResult {
  */
 export async function sendNotification(notification: Notification): Promise<NotificationResult> {
   // TODO: Implement this by calling a notification API.
+  console.log(`Sending notification to ${notification.recipient}:`);
+  console.log(`Subject: ${notification.subject}`);
+  console.log(`Body: ${notification.body}`);
+
+  // Simulate API call delay
+  await new Promise(resolve => setTimeout(resolve, 200));
 
   return {
     success: true,
-    message: 'Notification sent successfully',
+    message: 'Notification sent successfully (simulated)',
   };
 }
+
