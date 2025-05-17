@@ -4,7 +4,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FileText, Download, CalendarDays, Filter, ArrowLeft, Utensils, AlertCircle } from "lucide-react";
+import { FileText, CalendarDays, Filter, ArrowLeft, Utensils, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import {
   ChartContainer,
@@ -149,9 +149,7 @@ export default function SalesReportsPage() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Button disabled>
-              <Download className="mr-2 h-4 w-4" /> Download Report
-            </Button>
+            {/* Removed Download Report Button */}
           </div>
         </header>
 
@@ -259,3 +257,4 @@ export default function SalesReportsPage() {
     </div>
   );
 }
+
