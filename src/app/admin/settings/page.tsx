@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Settings, Save, Utensils, ArrowLeft, Palette, ShieldCheck } from "lucide-react"; // Removed Bell
+import { Settings, Save, Utensils, ArrowLeft, Palette, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
@@ -15,11 +15,9 @@ const LOCAL_STORAGE_PREFIX = "adminSettings_";
 
 export default function AdminSettingsPage() {
     const { toast } = useToast();
-    const [siteName, setSiteName] = useState("IIIT Mess"); // Default changed
-    const [defaultCurrency, setDefaultCurrency] = useState("INR"); // Default changed to INR
-    // Removed enableEmailNotifications and adminNotificationEmail states
-    const [maintenanceMode, setMaintenanceMode] = useState(false);
-    const [primaryColor, setPrimaryColor] = useState("#4CAF50"); // Default from globals.css primary HSL
+    const [siteName, setSiteName] = useState("IIIT Mess");
+    const [defaultCurrency, setDefaultCurrency] = useState("INR");
+    const [primaryColor, setPrimaryColor] = useState("#4CAF50"); 
     const [sessionTimeout, setSessionTimeout] = useState(30);
 
 
@@ -34,13 +32,10 @@ export default function AdminSettingsPage() {
         const loadedCurrency = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}defaultCurrency`);
         if (loadedCurrency) setDefaultCurrency(loadedCurrency);
         
-        const loadedMaintenanceMode = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}maintenanceMode`);
-        if (loadedMaintenanceMode) setMaintenanceMode(loadedMaintenanceMode === 'true');
-
         const loadedPrimaryColor = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}primaryColor`);
         if (loadedPrimaryColor) {
             setPrimaryColor(loadedPrimaryColor);
-            document.documentElement.style.setProperty('--primary-color-dynamic', loadedPrimaryColor);
+            document.documentElement.style.setProperty('--primary', loadedPrimaryColor);
         }
         
         const loadedSessionTimeout = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}sessionTimeout`);
@@ -56,8 +51,6 @@ export default function AdminSettingsPage() {
     const handleSaveChanges = () => {
         localStorage.setItem(`${LOCAL_STORAGE_PREFIX}siteName`, siteName);
         localStorage.setItem(`${LOCAL_STORAGE_PREFIX}defaultCurrency`, defaultCurrency);
-        // Removed saving for email notifications and admin email
-        localStorage.setItem(`${LOCAL_STORAGE_PREFIX}maintenanceMode`, String(maintenanceMode));
         localStorage.setItem(`${LOCAL_STORAGE_PREFIX}primaryColor`, primaryColor);
         localStorage.setItem(`${LOCAL_STORAGE_PREFIX}sessionTimeout`, String(sessionTimeout));
         
@@ -112,21 +105,9 @@ export default function AdminSettingsPage() {
                     <div>
                         <Label htmlFor="defaultCurrency">Default Currency</Label>
                         <Input id="defaultCurrency" value={defaultCurrency} onChange={(e) => setDefaultCurrency(e.target.value)} placeholder="e.g., INR, USD" />
-                         <p className="text-xs text-muted-foreground mt-1">Note: Changing currency here is for display preference. Actual currency processing is handled elsewhere.</p>
-                    </div>
-                     <div className="flex items-center justify-between space-x-2 pt-2">
-                        <Label htmlFor="maintenance-mode" className="flex flex-col space-y-1">
-                            <span>Maintenance Mode</span>
-                            <span className="font-normal leading-snug text-muted-foreground">
-                            Temporarily disable access for users (simulated).
-                            </span>
-                        </Label>
-                        <Switch id="maintenance-mode" checked={maintenanceMode} onCheckedChange={setMaintenanceMode} aria-label="Maintenance mode" />
                     </div>
                 </CardContent>
             </Card>
-
-            {/* Notification Settings Card Removed */}
 
             {/* Appearance Settings */}
             <Card>
