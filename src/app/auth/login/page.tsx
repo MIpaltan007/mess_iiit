@@ -131,12 +131,7 @@ export default function LoginPage() {
           </Form>
         </CardContent>
         <CardFooter className="flex flex-col items-center space-y-2">
-          <p className="text-sm text-muted-foreground">
-            Forgot your password?{' '}
-            <Link href="/auth/forgot-password" legacyBehavior>
-              <a className="font-medium text-primary hover:underline">Reset it here</a>
-            </Link>
-          </p>
+          {/* Removed "Forgot password" link */}
           <p className="text-sm text-muted-foreground">
             Don&apos;t have an account?{' '}
             <Link href="/auth/register" legacyBehavior>
