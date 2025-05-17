@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,38 +7,163 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PlusCircle, Edit, Trash2, Utensils, ArrowLeft } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { PlusCircle, Edit, Trash2, Utensils, ArrowLeft, Carrot, Leaf, Fish, WheatOff } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect, FormEvent } from "react";
+import { useToast } from "@/hooks/use-toast";
 
-interface MenuItem {
+type DietaryTag = 'Vegetarian' | 'Vegan' | 'Gluten-Free' | 'Non-Veg';
+
+const ALL_DIETARY_TAGS: DietaryTag[] = ['Vegetarian', 'Vegan', 'Gluten-Free', 'Non-Veg'];
+const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const MEAL_TYPES: MenuItem['mealType'][] = ['Breakfast', 'Lunch', 'Dinner'];
+
+export interface MenuItem {
   id: string;
   day: string;
   mealType: 'Breakfast' | 'Lunch' | 'Dinner';
   name: string;
   description: string;
-  dietaryTags: string[]; // e.g., ['Vegetarian', 'Gluten-Free']
+  dietaryTags: DietaryTag[];
   calories: number;
+  price: number;
 }
 
-const initialMenuItems: MenuItem[] = [
-  { id: '1', day: 'Monday', mealType: 'Breakfast', name: 'Scrambled Eggs', description: 'Fluffy scrambled eggs with a side of toast.', dietaryTags: ['Non-Veg'], calories: 300 },
-  { id: '2', day: 'Monday', mealType: 'Lunch', name: 'Chicken Caesar Salad', description: 'Grilled chicken, romaine lettuce, croutons, and Caesar dressing.', dietaryTags: ['Non-Veg'], calories: 450 },
-  { id: '3', day: 'Tuesday', mealType: 'Dinner', name: 'Vegetable Curry', description: 'Mixed vegetables in a mild coconut curry sauce.', dietaryTags: ['Vegan', 'Vegetarian'], calories: 400 },
+const getPrice = (mealType: 'Breakfast' | 'Lunch' | 'Dinner'): number => {
+  switch (mealType) {
+    case 'Breakfast': return 25;
+    case 'Lunch': return 45;
+    case 'Dinner': return 40;
+    default: return 0;
+  }
+};
+
+const initialMenuData: Omit<MenuItem, 'price'>[] = [
+  { id: '1', day: 'Monday', mealType: 'Breakfast', name: 'Scrambled Eggs & Toast', description: 'Classic scrambled eggs with whole wheat toast.', dietaryTags: ['Non-Veg'], calories: 350 },
+  { id: '2', day: 'Monday', mealType: 'Lunch', name: 'Chicken Salad Sandwich', description: 'Grilled chicken salad on multigrain bread.', dietaryTags: ['Non-Veg'], calories: 550 },
+  { id: '3', day: 'Monday', mealType: 'Dinner', name: 'Lentil Soup', description: 'Hearty lentil soup with vegetables.', dietaryTags: ['Vegan', 'Vegetarian', 'Gluten-Free'], calories: 400 },
+  { id: '4', day: 'Tuesday', mealType: 'Breakfast', name: 'Oatmeal with Berries', description: 'Warm oatmeal topped with mixed berries and nuts.', dietaryTags: ['Vegan', 'Vegetarian', 'Gluten-Free'], calories: 300 },
+  { id: '5', day: 'Tuesday', mealType: 'Lunch', name: 'Quinoa Salad', description: 'Refreshing quinoa salad with cucumber, tomatoes, and feta.', dietaryTags: ['Vegetarian', 'Gluten-Free'], calories: 450 },
+  { id: '6', day: 'Tuesday', mealType: 'Dinner', name: 'Grilled Salmon', description: 'Salmon fillet grilled to perfection with roasted asparagus.', dietaryTags: ['Non-Veg', 'Gluten-Free'], calories: 600 },
+   // ... Add more items for Wednesday to Sunday if desired, or they can be added via the UI
+  { id: '7', day: 'Wednesday', mealType: 'Breakfast', name: 'Pancakes', description: 'Fluffy pancakes with maple syrup.', dietaryTags: ['Vegetarian'], calories: 450 },
+  { id: '8', day: 'Wednesday', mealType: 'Lunch', name: 'Vegetable Stir-fry', description: 'Mixed vegetables stir-fried with tofu and soy sauce.', dietaryTags: ['Vegan', 'Vegetarian'], calories: 500 },
+  { id: '9', day: 'Wednesday', mealType: 'Dinner', name: 'Spaghetti Bolognese', description: 'Classic spaghetti with a rich meat sauce.', dietaryTags: ['Non-Veg'], calories: 650 },
 ];
+
+const menuDataWithPrices: MenuItem[] = initialMenuData.map(item => ({
+  ...item,
+  price: getPrice(item.mealType),
+}));
+
+const dietaryTagIcons: Record<DietaryTag, React.ReactElement> = {
+  'Vegetarian': <Leaf className="h-4 w-4 text-green-500" />,
+  'Vegan': <Carrot className="h-4 w-4 text-orange-500" />,
+  'Gluten-Free': <WheatOff className="h-4 w-4 text-yellow-500" />,
+  'Non-Veg': <Fish className="h-4 w-4 text-blue-500" />,
+};
+
+const defaultNewItem: Omit<MenuItem, 'id'> = {
+  day: 'Monday',
+  mealType: 'Breakfast',
+  name: '',
+  description: '',
+  dietaryTags: [],
+  calories: 0,
+  price: getPrice('Breakfast'),
+};
 
 
 export default function MenuManagementPage() {
-  const [menuItems, setMenuItems] = useState<MenuItem[]>(initialMenuItems);
-  const [isAdding, setIsAdding] = useState(false);
-  const [isEditing, setIsEditing] = useState<MenuItem | null>(null);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>(menuDataWithPrices);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<MenuItem | null>(null); // Item being edited
+  const [currentItemForm, setCurrentItemForm] = useState<Omit<MenuItem, 'id'>>(defaultNewItem); // Form state
+  const [itemToDelete, setItemToDelete] = useState<MenuItem | null>(null);
+  const { toast } = useToast();
 
-  // TODO: Implement form handling for adding/editing items
-  // TODO: Implement delete functionality
+  const handleAddNewClick = () => {
+    setEditingItem(null);
+    setCurrentItemForm({ ...defaultNewItem, price: getPrice(defaultNewItem.mealType) });
+    setIsFormOpen(true);
+  };
+
+  const handleEditClick = (item: MenuItem) => {
+    setEditingItem(item);
+    setCurrentItemForm({ ...item });
+    setIsFormOpen(true);
+  };
+
+  const handleDeleteClick = (item: MenuItem) => {
+    setItemToDelete(item);
+  };
+
+  const confirmDelete = () => {
+    if (itemToDelete) {
+      setMenuItems(prevItems => prevItems.filter(item => item.id !== itemToDelete.id));
+      toast({ title: "Item Deleted", description: `${itemToDelete.name} has been removed from the menu.` });
+      setItemToDelete(null);
+    }
+  };
+
+  const handleFormInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setCurrentItemForm(prev => ({
+      ...prev,
+      [name]: name === 'calories' || name === 'price' ? parseFloat(value) || 0 : value,
+    }));
+  };
+
+  const handleSelectChange = (name: 'day' | 'mealType', value: string) => {
+    setCurrentItemForm(prev => {
+        const updatedForm = { ...prev, [name]: value };
+        if (name === 'mealType') {
+            updatedForm.price = getPrice(value as MenuItem['mealType']);
+        }
+        return updatedForm;
+    });
+  };
+
+  const handleDietaryTagChange = (tag: DietaryTag, checked: boolean) => {
+    setCurrentItemForm(prev => {
+      const newTags = checked
+        ? [...prev.dietaryTags, tag]
+        : prev.dietaryTags.filter(t => t !== tag);
+      return { ...prev, dietaryTags: newTags };
+    });
+  };
+
+  const handleSubmitForm = (e: FormEvent) => {
+    e.preventDefault();
+    if (!currentItemForm.name.trim()) {
+        toast({ title: "Validation Error", description: "Item name cannot be empty.", variant: "destructive" });
+        return;
+    }
+    if (currentItemForm.calories < 0 || currentItemForm.price < 0) {
+        toast({ title: "Validation Error", description: "Calories and price cannot be negative.", variant: "destructive" });
+        return;
+    }
+
+    if (editingItem) { // Edit mode
+      setMenuItems(prevItems => prevItems.map(item => item.id === editingItem.id ? { ...currentItemForm, id: editingItem.id } : item));
+      toast({ title: "Item Updated", description: `${currentItemForm.name} has been successfully updated.` });
+    } else { // Add mode
+      const newItemWithId: MenuItem = { ...currentItemForm, id: String(Date.now()) };
+      setMenuItems(prevItems => [...prevItems, newItemWithId]);
+      toast({ title: "Item Added", description: `${currentItemForm.name} has been successfully added.` });
+    }
+    setIsFormOpen(false);
+    setEditingItem(null);
+  };
+
 
   return (
     <div className="flex min-h-screen bg-secondary">
-      {/* Sidebar (consider making this a reusable component) */}
       <aside className="w-64 bg-card text-card-foreground p-4 space-y-6 shadow-lg">
         <div className="flex items-center gap-2 text-primary">
           <Utensils className="h-8 w-8" />
@@ -54,71 +180,144 @@ export default function MenuManagementPage() {
               <Utensils className="h-5 w-5" /> Menu Management
             </a>
           </Link>
-          {/* Add other admin links here */}
         </nav>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 p-8 space-y-8">
         <header className="flex justify-between items-center">
           <h2 className="text-3xl font-semibold text-primary">Menu Management</h2>
-          <Button onClick={() => { setIsAdding(true); setIsEditing(null); }}>
+          <Button onClick={handleAddNewClick}>
             <PlusCircle className="mr-2 h-5 w-5" /> Add New Item
           </Button>
         </header>
 
-        {isAdding || isEditing ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>{isEditing ? 'Edit Menu Item' : 'Add New Menu Item'}</CardTitle>
-              <CardDescription>{isEditing ? 'Modify the details of the existing menu item.' : 'Fill in the details for the new menu item.'}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* This would be a form. For brevity, it's simplified. */}
-              <div>
-                <Label htmlFor="itemName">Item Name</Label>
-                <Input id="itemName" placeholder="e.g., Pasta Primavera" defaultValue={isEditing?.name || ''} />
+        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <form onSubmit={handleSubmitForm}>
+              <DialogHeader>
+                <DialogTitle>{editingItem ? 'Edit Menu Item' : 'Add New Menu Item'}</DialogTitle>
+                <DialogDescription>
+                  {editingItem ? 'Modify the details of the existing menu item.' : 'Fill in the details for the new menu item.'}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="name" className="text-right">Name</Label>
+                  <Input id="name" name="name" value={currentItemForm.name} onChange={handleFormInputChange} className="col-span-3" required />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="description" className="text-right">Description</Label>
+                  <Textarea id="description" name="description" value={currentItemForm.description} onChange={handleFormInputChange} className="col-span-3" />
+                </div>
+                 <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="day" className="text-right">Day</Label>
+                  <Select name="day" value={currentItemForm.day} onValueChange={(value) => handleSelectChange('day', value)}>
+                    <SelectTrigger className="col-span-3"> <SelectValue placeholder="Select day" /> </SelectTrigger>
+                    <SelectContent> {DAYS_OF_WEEK.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)} </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="mealType" className="text-right">Meal Type</Label>
+                  <Select name="mealType" value={currentItemForm.mealType} onValueChange={(value) => handleSelectChange('mealType', value)}>
+                    <SelectTrigger className="col-span-3"> <SelectValue placeholder="Select meal type" /> </SelectTrigger>
+                    <SelectContent> {MEAL_TYPES.map(mt => <SelectItem key={mt} value={mt}>{mt}</SelectItem>)} </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="calories" className="text-right">Calories</Label>
+                  <Input id="calories" name="calories" type="number" value={currentItemForm.calories} onChange={handleFormInputChange} className="col-span-3" min="0" />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="price" className="text-right">Price (₹)</Label>
+                  <Input id="price" name="price" type="number" value={currentItemForm.price} onChange={handleFormInputChange} className="col-span-3" min="0" step="0.01" />
+                </div>
+                <div className="grid grid-cols-4 items-start gap-4">
+                  <Label className="text-right pt-2">Dietary Tags</Label>
+                  <div className="col-span-3 space-y-2">
+                    {ALL_DIETARY_TAGS.map(tag => (
+                      <div key={tag} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`dietary-${tag}`}
+                          checked={currentItemForm.dietaryTags.includes(tag)}
+                          onCheckedChange={(checked) => handleDietaryTagChange(tag, !!checked)}
+                        />
+                        <Label htmlFor={`dietary-${tag}`} className="font-normal flex items-center gap-1">
+                          {dietaryTagIcons[tag]} {tag}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <div>
-                <Label htmlFor="itemDescription">Description</Label>
-                <Textarea id="itemDescription" placeholder="Describe the item..." defaultValue={isEditing?.description || ''} />
-              </div>
-              {/* Add fields for Day, Meal Type, Dietary Tags, Calories etc. */}
-              <div className="flex gap-4">
-                 <Button variant="outline" onClick={() => { setIsAdding(false); setIsEditing(null); }}>Cancel</Button>
-                 <Button>{isEditing ? 'Save Changes' : 'Add Item'}</Button>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle>Current Menu Items</CardTitle>
-              <CardDescription>View, edit, or delete existing menu items.</CardDescription>
-            </CardHeader>
-            <CardContent>
+              <DialogFooter>
+                <DialogClose asChild>
+                    <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>Cancel</Button>
+                </DialogClose>
+                <Button type="submit">{editingItem ? 'Save Changes' : 'Add Item'}</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        <AlertDialog open={!!itemToDelete} onOpenChange={(open) => !open && setItemToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the item "{itemToDelete?.name}" from the menu.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setItemToDelete(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Current Menu Items</CardTitle>
+            <CardDescription>View, edit, or delete existing menu items.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {menuItems.length > 0 ? (
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Day</TableHead>
                     <TableHead>Meal Type</TableHead>
                     <TableHead>Name</TableHead>
-                    <TableHead>Calories</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Dietary Tags</TableHead>
+                    <TableHead className="text-right">Calories</TableHead>
+                    <TableHead className="text-right">Price (₹)</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {menuItems.map((item) => (
+                  {menuItems.sort((a,b) => DAYS_OF_WEEK.indexOf(a.day) - DAYS_OF_WEEK.indexOf(b.day) || MEAL_TYPES.indexOf(a.mealType) - MEAL_TYPES.indexOf(b.mealType) )
+                  .map((item) => (
                     <TableRow key={item.id}>
                       <TableCell>{item.day}</TableCell>
                       <TableCell>{item.mealType}</TableCell>
                       <TableCell className="font-medium">{item.name}</TableCell>
-                      <TableCell>{item.calories} kcal</TableCell>
-                      <TableCell className="space-x-2">
-                        <Button variant="ghost" size="icon" onClick={() => { setIsEditing(item); setIsAdding(false);}}>
+                      <TableCell className="text-sm text-muted-foreground max-w-xs truncate">{item.description}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {item.dietaryTags.map(tag => (
+                            <Badge key={tag} variant="secondary" className="flex items-center gap-1 capitalize">
+                              {dietaryTagIcons[tag]} {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">{item.calories} kcal</TableCell>
+                       <TableCell className="text-right">₹{item.price.toFixed(2)}</TableCell>
+                      <TableCell className="space-x-1 whitespace-nowrap">
+                        <Button variant="ghost" size="icon" onClick={() => handleEditClick(item)}>
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => handleDeleteClick(item)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </TableCell>
@@ -126,9 +325,11 @@ export default function MenuManagementPage() {
                   ))}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
-        )}
+            ) : (
+                 <p className="text-center text-muted-foreground py-4">No menu items available. Click "Add New Item" to get started.</p>
+            )}
+          </CardContent>
+        </Card>
       </main>
     </div>
   );
