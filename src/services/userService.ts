@@ -38,9 +38,9 @@ export async function saveUserProfile(profile: UserProfile): Promise<void> {
     await setDoc(userDocRef, profile, { merge: true }); // Use merge to avoid overwriting if doc exists
   } catch (error: any) {
     console.error(
-      "Error saving user profile to Firestore:", 
-      error.message, 
-      error.code ? `(Code: ${error.code})` : '', 
+      "Error saving user profile to Firestore:",
+      error.message,
+      error.code ? `(Code: ${error.code})` : '',
       error.stack ? `\nStack: ${error.stack}` : ''
     );
     throw new Error("Could not save user profile. Check server logs for details.");
@@ -63,13 +63,34 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
     return null;
   } catch (error: any) {
     console.error(
-      `Error fetching user profile ${uid} from Firestore:`, 
-      error.message, 
-      error.code ? `(Code: ${error.code})` : '', 
+      `Error fetching user profile ${uid} from Firestore:`,
+      error.message,
+      error.code ? `(Code: ${error.code})` : '',
       error.stack ? `\nStack: ${error.stack}` : ''
     );
     // Don't throw, return null so app can proceed with default role/prices
-    return null; 
+    return null;
+  }
+}
+
+/**
+ * Fetches all user profiles from Firestore.
+ * @returns A promise that resolves to an array of UserProfile objects.
+ */
+export async function getAllUserProfiles(): Promise<UserProfile[]> {
+  const usersCollectionRef = collection(db, 'users');
+  try {
+    const querySnapshot = await getDocs(usersCollectionRef);
+    return querySnapshot.docs.map(doc => doc.data() as UserProfile).filter(profile => profile.email && profile.role);
+  } catch (error: any)
+ {
+    console.error(
+      "Error fetching all user profiles:",
+      error.message,
+      error.code ? `(Code: ${error.code})` : '',
+      error.stack ? `\nStack: ${error.stack}` : ''
+    );
+    return []; // Return empty array on error
   }
 }
 
@@ -81,15 +102,15 @@ export async function getTotalUsersCount(): Promise<number> {
 
 export async function getAllUsers(): Promise<User[]> {
   const ordersCollectionRef = collection(db, 'orders');
-  const q = query(ordersCollectionRef, orderBy('createdAt', 'asc')); 
+  const q = query(ordersCollectionRef, orderBy('createdAt', 'asc'));
 
   try {
     const querySnapshot = await getDocs(q);
     const usersMap = new Map<string, { name: string; email: string; totalMealCost: number; firstOrderDate: Date }>();
 
     querySnapshot.docs.forEach((doc) => {
-      const order = doc.data() as Omit<OrderData, 'id'>; 
-      if (!order.userEmail) return; 
+      const order = doc.data() as Omit<OrderData, 'id'>;
+      if (!order.userEmail) return;
 
       const existingUser = usersMap.get(order.userEmail);
       const orderDate = (order.createdAt as Timestamp).toDate();
@@ -105,7 +126,7 @@ export async function getAllUsers(): Promise<User[]> {
       } else {
         usersMap.set(order.userEmail, {
           email: order.userEmail,
-          name: order.userName || order.userEmail, 
+          name: order.userName || order.userEmail,
           totalMealCost: order.totalCost,
           firstOrderDate: orderDate,
         });
@@ -113,28 +134,28 @@ export async function getAllUsers(): Promise<User[]> {
     });
 
     const usersArray: User[] = Array.from(usersMap.entries()).map(([email, data]) => ({
-      id: email, 
+      id: email,
       email: data.email,
       name: data.name,
       totalMealCost: data.totalMealCost,
-      joinDate: data.firstOrderDate.toISOString(), 
+      joinDate: data.firstOrderDate.toISOString(),
     }));
 
     return usersArray.sort((a, b) => a.name.localeCompare(b.name));
 
   } catch (error: any) {
     console.error(
-      "Error fetching users from orders:", 
-      error.message, 
-      error.code ? `(Code: ${error.code})` : '', 
+      "Error fetching users from orders:",
+      error.message,
+      error.code ? `(Code: ${error.code})` : '',
       error.stack ? `\nStack: ${error.stack}` : ''
     );
-    return []; 
+    return [];
   }
 }
 
 export async function getRecentUsers(count: number): Promise<User[]> {
-  const allUsers = await getAllUsers(); 
+  const allUsers = await getAllUsers();
   const sortedUsers = [...allUsers].sort((a, b) => new Date(b.joinDate).getTime() - new Date(a.joinDate).getTime());
   return sortedUsers.slice(0, count);
 }

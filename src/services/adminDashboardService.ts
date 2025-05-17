@@ -4,8 +4,9 @@
 
 import { collection, getDocs, query, orderBy, limit as firestoreLimit, Timestamp, where } from 'firebase/firestore';
 import { db } from './firebase';
-import type { OrderData } from './orderService'; 
+import type { OrderData } from './orderService';
 import { format } from 'date-fns';
+import { getAllUserProfiles, type UserProfile, type UserRole } from './userService'; // Import UserRole
 
 export interface DashboardStats {
   totalRevenue: number;
@@ -20,10 +21,10 @@ export interface SalesChartDataItem { // For Admin Dashboard main page
 
 export interface RecentSaleRecord { // For Admin Dashboard main page
   id: string;
-  user: string; 
-  itemsSummary: string; 
+  user: string;
+  itemsSummary: string;
   amount: number;
-  date: string; 
+  date: string;
 }
 
 // Types for Sales Report Page
@@ -39,6 +40,7 @@ export interface DetailedSaleItem { // For Sales Report page table
   user: string;
   itemsCount: number;
   totalAmount: number;
+  role?: UserRole; // Optional: for displaying user role if needed
 }
 
 export interface SalesReport {
@@ -90,7 +92,7 @@ export async function getDashboardData(): Promise<{
 
   const salesChartData: SalesChartDataItem[] = Object.entries(monthlySales)
     .map(([month, sales]) => ({ month, sales }))
-    .sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime()); 
+    .sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime());
 
   return {
     stats: { totalRevenue, totalOrders, totalMealsOrdered },
@@ -101,20 +103,23 @@ export async function getDashboardData(): Promise<{
 
 
 /**
- * Fetches and processes sales data for the Sales Report page, optionally filtered by a date range.
+ * Fetches and processes sales data for the Sales Report page, optionally filtered by a date range and user role.
  * @param range - Optional date range to filter sales data.
+ * @param roleFilter - Optional role to filter sales data by ('Student', 'Staff', 'Admin', or 'All').
  */
-export async function getSalesReports(range?: { from?: Date; to?: Date }): Promise<SalesReport> {
+export async function getSalesReports(
+  range?: { from?: Date; to?: Date },
+  roleFilter: UserRole | 'All' = 'All'
+): Promise<SalesReport> {
   const ordersCollectionRef = collection(db, 'orders');
   let q;
 
   if (range?.from && range?.to) {
-    // Ensure 'to' date includes the whole day
     const toDate = new Date(range.to);
     toDate.setHours(23, 59, 59, 999);
     q = query(
       ordersCollectionRef,
-      orderBy('createdAt', 'asc'), // Order ascending for chronological processing
+      orderBy('createdAt', 'asc'),
       where('createdAt', '>=', Timestamp.fromDate(range.from)),
       where('createdAt', '<=', Timestamp.fromDate(toDate))
     );
@@ -123,6 +128,14 @@ export async function getSalesReports(range?: { from?: Date; to?: Date }): Promi
   }
 
   const querySnapshot = await getDocs(q);
+
+  const allUserProfiles = await getAllUserProfiles();
+  const userRolesMap = new Map<string, UserRole>();
+  allUserProfiles.forEach(profile => {
+    if (profile.email) {
+      userRolesMap.set(profile.email, profile.role);
+    }
+  });
 
   const dailySales: { [key: string]: { totalSales: number; orderCount: number } } = {};
   const detailedSales: DetailedSaleItem[] = [];
@@ -134,20 +147,25 @@ export async function getSalesReports(range?: { from?: Date; to?: Date }): Promi
     const orderDate = (order.createdAt as Timestamp).toDate();
     const dayKey = format(orderDate, "yyyy-MM-dd");
 
-    // Aggregate for chart data
+    const userRole = userRolesMap.get(order.userEmail) || 'Student'; // Default to Student
+
+    if (roleFilter !== 'All' && userRole !== roleFilter) {
+      return; // Skip this order if it doesn't match the role filter
+    }
+
     if (!dailySales[dayKey]) {
       dailySales[dayKey] = { totalSales: 0, orderCount: 0 };
     }
     dailySales[dayKey].totalSales += order.totalCost;
     dailySales[dayKey].orderCount++;
 
-    // Prepare detailed sale item
     detailedSales.push({
       id: order.id || doc.id,
-      date: format(orderDate, "PP"), // e.g., Jul 20, 2024
+      date: format(orderDate, "PP"),
       user: order.userName || order.userEmail,
       itemsCount: order.selectedMeals.length,
       totalAmount: order.totalCost,
+      role: userRole, // Store the role for potential display
     });
 
     overallTotalSales += order.totalCost;
@@ -156,7 +174,7 @@ export async function getSalesReports(range?: { from?: Date; to?: Date }): Promi
 
   const chartData: SalesReportChartItem[] = Object.entries(dailySales)
     .map(([date, data]) => ({
-      date, // Keep as yyyy-MM-dd for sorting and x-axis
+      date,
       totalSales: data.totalSales,
       orderCount: data.orderCount,
     }))
@@ -164,12 +182,10 @@ export async function getSalesReports(range?: { from?: Date; to?: Date }): Promi
 
   return {
     chartData,
-    detailedSales: detailedSales.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()), // Sort detailed sales by most recent
+    detailedSales: detailedSales.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
     summary: {
       totalSales: overallTotalSales,
       totalOrders: overallTotalOrders,
     },
   };
 }
-
-    

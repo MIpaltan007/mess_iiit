@@ -16,12 +16,21 @@ import {
 import { Line, CartesianGrid, XAxis, YAxis, LineChart as RechartsLineChart, ResponsiveContainer, Tooltip as RechartsTooltip } from "recharts";
 import { useEffect, useState } from "react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Calendar } from "@/components/ui/calendar";
 import { DateRange } from "react-day-picker";
 import { format, subDays } from "date-fns";
 import { getSalesReports, type SalesReport, type SalesReportChartItem, type DetailedSaleItem } from "@/services/adminDashboardService";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import type { UserRole } from "@/services/userService";
 
 const initialChartConfig = {
   totalSales: {
@@ -34,6 +43,8 @@ const initialChartConfig = {
   },
 };
 
+const ROLE_FILTER_OPTIONS: (UserRole | 'All')[] = ['All', 'Student', 'Staff', 'Admin'];
+
 export default function SalesReportsPage() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: subDays(new Date(), 29), // Default to last 30 days
@@ -43,14 +54,15 @@ export default function SalesReportsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [chartConfig, setChartConfig] = useState(initialChartConfig);
+  const [roleFilter, setRoleFilter] = useState<UserRole | 'All'>('All');
 
   useEffect(() => {
     async function fetchData() {
       setIsLoading(true);
       setError(null);
-      setReportData(null);
+      setReportData(null); // Clear previous data
       try {
-        const data = await getSalesReports(dateRange);
+        const data = await getSalesReports(dateRange, roleFilter);
         setReportData(data);
       } catch (err) {
         console.error("Failed to fetch sales reports:", err);
@@ -60,7 +72,7 @@ export default function SalesReportsPage() {
       }
     }
     fetchData();
-  }, [dateRange]);
+  }, [dateRange, roleFilter]);
 
   const formatDateForDisplay = (date: Date | undefined) => {
     return date ? format(date, "LLL dd, y") : "Pick a date";
@@ -93,7 +105,7 @@ export default function SalesReportsPage() {
           <div className="flex gap-2 flex-wrap">
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="w-[280px] justify-start text-left font-normal">
+                <Button variant="outline" className="w-full md:w-[280px] justify-start text-left font-normal">
                   <CalendarDays className="mr-2 h-4 w-4" />
                   {dateRange?.from ? (
                     dateRange.to ? (
@@ -119,9 +131,24 @@ export default function SalesReportsPage() {
                 />
               </PopoverContent>
             </Popover>
-            <Button variant="outline" disabled>
-              <Filter className="mr-2 h-4 w-4" /> Filter
-            </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <Filter className="mr-2 h-4 w-4" /> {roleFilter}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Filter by Role</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {ROLE_FILTER_OPTIONS.map(option => (
+                    <DropdownMenuItem key={option} onSelect={() => setRoleFilter(option)}>
+                        {option}
+                    </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <Button disabled>
               <Download className="mr-2 h-4 w-4" /> Download Report
             </Button>
@@ -139,34 +166,36 @@ export default function SalesReportsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Sales Performance Overview</CardTitle>
-            <CardDescription>Visual representation of sales trends for the selected period.</CardDescription>
+            <CardDescription>
+              Visual representation of sales trends for the selected period and filter (Role: {roleFilter}).
+            </CardDescription>
           </CardHeader>
           <CardContent className="pl-2 h-[350px]">
             {isLoading ? (
               <Skeleton className="h-full w-full" />
             ) : !reportData || reportData.chartData.length === 0 ? (
-              <p className="text-center text-muted-foreground py-10">No sales data available for the selected period.</p>
+              <p className="text-center text-muted-foreground py-10">No sales data available for the selected period and filter.</p>
             ) : (
               <ChartContainer config={chartConfig} className="h-full w-full">
                 <RechartsLineChart accessibilityLayer data={reportData.chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                   <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="date" 
+                  <XAxis
+                    dataKey="date"
                     tickFormatter={(value) => format(new Date(value), "MMM d")}
                     padding={{ left: 10, right: 10 }}
                     tickMargin={5}
                   />
                   <YAxis yAxisId="left" stroke="var(--color-totalSales)" tickFormatter={(value) => `₹${value}`} />
                   <YAxis yAxisId="right" orientation="right" stroke="var(--color-orderCount)" />
-                  <RechartsTooltip 
-                    content={<ChartTooltipContent 
+                  <RechartsTooltip
+                    content={<ChartTooltipContent
                         formatter={(value, name) => {
                             if (name === "totalSales") return `₹${Number(value).toFixed(2)}`;
                             if (name === "orderCount") return `${Number(value)} orders`;
                             return String(value);
                         }}
                         labelFormatter={(label) => format(new Date(label), "PP")}
-                    />} 
+                    />}
                     cursor={{ strokeDasharray: '3 3' }}
                   />
                   <ChartLegend content={<ChartLegendContent />} />
@@ -181,7 +210,9 @@ export default function SalesReportsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Detailed Sales Data</CardTitle>
-            <CardDescription>A comprehensive list of sales transactions for the selected period.</CardDescription>
+            <CardDescription>
+              A comprehensive list of sales transactions for the selected period and filter (Role: {roleFilter}).
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -189,7 +220,7 @@ export default function SalesReportsPage() {
                   {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
               </div>
             ) : !reportData || reportData.detailedSales.length === 0 ? (
-              <p className="text-center text-muted-foreground py-10">No detailed sales records available for the selected period.</p>
+              <p className="text-center text-muted-foreground py-10">No detailed sales records available for the selected period and filter.</p>
             ) : (
               <>
                 <Table>
@@ -198,6 +229,7 @@ export default function SalesReportsPage() {
                       <TableHead>Order ID</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>User</TableHead>
+                      <TableHead>Role</TableHead>
                       <TableHead className="text-right">Items</TableHead>
                       <TableHead className="text-right">Total Amount (₹)</TableHead>
                     </TableRow>
@@ -208,6 +240,7 @@ export default function SalesReportsPage() {
                         <TableCell className="font-mono text-xs">{sale.id}</TableCell>
                         <TableCell>{sale.date}</TableCell>
                         <TableCell className="truncate max-w-[200px]">{sale.user}</TableCell>
+                        <TableCell>{sale.role || 'N/A'}</TableCell>
                         <TableCell className="text-right">{sale.itemsCount}</TableCell>
                         <TableCell className="text-right">₹{sale.totalAmount.toFixed(2)}</TableCell>
                       </TableRow>
@@ -215,8 +248,8 @@ export default function SalesReportsPage() {
                   </TableBody>
                 </Table>
                 <div className="mt-4 pt-4 border-t font-semibold text-right">
-                  <p>Total Sales for Period: ₹{reportData.summary.totalSales.toFixed(2)}</p>
-                  <p>Total Orders for Period: {reportData.summary.totalOrders}</p>
+                  <p>Total Sales for Period (Filter: {roleFilter}): ₹{reportData.summary.totalSales.toFixed(2)}</p>
+                  <p>Total Orders for Period (Filter: {roleFilter}): {reportData.summary.totalOrders}</p>
                 </div>
               </>
             )}
@@ -226,5 +259,3 @@ export default function SalesReportsPage() {
     </div>
   );
 }
-
-    
