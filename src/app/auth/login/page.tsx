@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -18,7 +19,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { UtensilsCrossed, LogIn } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-
+import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+import { app } from '@/services/firebase';
 
 const loginFormSchema = z.object({
   email: z.string().email({ message: 'Invalid email address.' }),
@@ -40,32 +42,28 @@ export default function LoginPage() {
   });
 
   async function onSubmit(values: LoginFormValues) {
-    // Simulate API call for login
-    console.log('Login submitted with:', values);
-    // In a real app, you would call your backend API here.
-    // For example:
-    // try {
-    //   const response = await fetch('/api/auth/login', { method: 'POST', body: JSON.stringify(values) });
-    //   if (response.ok) {
-    //     toast({ title: 'Login Successful!', description: 'Welcome back!' });
-    //     router.push('/'); // Redirect to dashboard or home
-    //   } else {
-    //     const errorData = await response.json();
-    //     toast({ title: 'Login Failed', description: errorData.message || 'Invalid credentials.', variant: 'destructive' });
-    //   }
-    // } catch (error) {
-    //   toast({ title: 'Error', description: 'An unexpected error occurred.', variant: 'destructive' });
-    // }
-
-    // Mock success
-    if (values.email === 'admin@example.com' && values.password === 'password') {
-        toast({ title: 'Admin Login Successful!', description: 'Redirecting to admin dashboard...' });
+    const auth = getAuth(app);
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
+      // const user = userCredential.user;
+      toast({ title: 'Login Successful!', description: 'Welcome back!' });
+      // Check if the user is an admin (e.g. by email) and redirect accordingly
+      if (values.email === process.env.NEXT_PUBLIC_ADMIN_EMAIL) { // Example admin check
         router.push('/admin');
-    } else if (values.email === 'user@example.com' && values.password === 'password') {
-        toast({ title: 'Login Successful!', description: 'Welcome back!' });
-        router.push('/');
-    } else {
-        toast({ title: 'Login Failed', description: 'Invalid email or password.', variant: 'destructive' });
+      } else {
+        router.push('/'); 
+      }
+    } catch (error: any) {
+      console.error('Login Failed:', error.message);
+      let errorMessage = 'Invalid credentials.';
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        errorMessage = 'Invalid email or password.';
+      } else if (error.code === 'auth/invalid-api-key') {
+        errorMessage = 'Configuration error. Please contact support.';
+      } else if (error.code === 'auth/network-request-failed') {
+        errorMessage = 'Network error. Please check your connection.';
+      }
+      toast({ title: 'Login Failed', description: errorMessage, variant: 'destructive' });
     }
   }
 
@@ -108,8 +106,8 @@ export default function LoginPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
-                <LogIn className="mr-2 h-5 w-5" /> Login
+              <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? 'Logging in...' : <><LogIn className="mr-2 h-5 w-5" /> Login</>}
               </Button>
             </form>
           </Form>

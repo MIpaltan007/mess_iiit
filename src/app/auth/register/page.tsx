@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -18,6 +19,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { UtensilsCrossed, UserPlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { app } from '@/services/firebase';
 
 const registerFormSchema = z.object({
   fullName: z.string().min(2, { message: 'Full name must be at least 2 characters.' }),
@@ -46,26 +49,28 @@ export default function RegisterPage() {
   });
 
   async function onSubmit(values: RegisterFormValues) {
-    // Simulate API call for registration
-    console.log('Registration submitted with:', values);
-    // In a real app, you would call your backend API here.
-    // For example:
-    // try {
-    //   const response = await fetch('/api/auth/register', { method: 'POST', body: JSON.stringify(values) });
-    //   if (response.ok) {
-    //     toast({ title: 'Registration Successful!', description: 'Please log in with your new account.' });
-    //     router.push('/auth/login'); 
-    //   } else {
-    //     const errorData = await response.json();
-    //     toast({ title: 'Registration Failed', description: errorData.message || 'Could not create account.', variant: 'destructive' });
-    //   }
-    // } catch (error) {
-    //   toast({ title: 'Error', description: 'An unexpected error occurred.', variant: 'destructive' });
-    // }
-
-    // Mock success
-    toast({ title: 'Registration Successful!', description: 'Please log in with your new account.' });
-    router.push('/auth/login');
+    const auth = getAuth(app);
+    try {
+      // const userCredential = 
+      await createUserWithEmailAndPassword(auth, values.email, values.password);
+      // const user = userCredential.user;
+      // You might want to store the fullName in Firestore or user profile here
+      toast({ title: 'Registration Successful!', description: 'Please log in with your new account.' });
+      router.push('/auth/login');
+    } catch (error: any) {
+      console.error('Registration Failed:', error.message);
+      let errorMessage = 'Could not create account.';
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = 'This email address is already in use.';
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = 'The password is too weak.';
+      } else if (error.code === 'auth/invalid-api-key') {
+        errorMessage = 'Configuration error. Please contact support.';
+      } else if (error.code === 'auth/network-request-failed') {
+        errorMessage = 'Network error. Please check your connection.';
+      }
+      toast({ title: 'Registration Failed', description: errorMessage, variant: 'destructive' });
+    }
   }
 
   return (
@@ -133,8 +138,8 @@ export default function RegisterPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
-                <UserPlus className="mr-2 h-5 w-5" /> Register
+              <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={form.formState.isSubmitting}>
+                 {form.formState.isSubmitting ? 'Registering...' : <> <UserPlus className="mr-2 h-5 w-5" /> Register </>}
               </Button>
             </form>
           </Form>
