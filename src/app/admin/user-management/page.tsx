@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Users, Edit, Trash2, Search, ArrowLeft, Utensils, AlertCircle, UserX } from "lucide-react";
+import { Users, Edit, Trash2, Search, ArrowLeft, Utensils, AlertCircle, UserX, DollarSign } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { getAllUsers, type User } from "@/services/userService";
@@ -81,7 +81,7 @@ export default function UserManagementPage() {
         <Card>
           <CardHeader>
             <CardTitle>All Users</CardTitle>
-            <CardDescription>Manage student, staff, and administrator accounts.</CardDescription>
+            <CardDescription>Overview of users based on their order history.</CardDescription>
             <div className="relative mt-4">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -99,12 +99,12 @@ export default function UserManagementPage() {
               <div className="space-y-2">
                 {[...Array(5)].map((_, i) => (
                   <div key={i} className="flex items-center space-x-4 p-2">
-                    <Skeleton className="h-10 w-10 rounded-full" />
+                    {/* <Skeleton className="h-10 w-10 rounded-full" /> */}
                     <div className="space-y-2 flex-1">
                       <Skeleton className="h-4 w-3/4" />
                       <Skeleton className="h-4 w-1/2" />
                     </div>
-                    <Skeleton className="h-8 w-20" />
+                    <Skeleton className="h-8 w-24" /> {/* Adjusted skeleton width */}
                   </div>
                 ))}
               </div>
@@ -114,9 +114,8 @@ export default function UserManagementPage() {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Current Plan</TableHead>
-                    <TableHead>Join Date</TableHead>
+                    <TableHead className="text-right">Total Spent (₹)</TableHead>
+                    <TableHead>First Order Date</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -125,16 +124,7 @@ export default function UserManagementPage() {
                     <TableRow key={user.id}>
                       <TableCell className="font-medium">{user.name}</TableCell>
                       <TableCell>{user.email}</TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          user.role === 'Admin' ? 'bg-red-100 text-red-700' : 
-                          user.role === 'Staff' ? 'bg-blue-100 text-blue-700' : 
-                          'bg-green-100 text-green-700'
-                        }`}>
-                          {user.role || 'N/A'}
-                        </span>
-                      </TableCell>
-                      <TableCell>{user.currentPlan || 'N/A'}</TableCell>
+                      <TableCell className="text-right">₹{user.totalMealCost.toFixed(2)}</TableCell>
                       <TableCell>{new Date(user.joinDate).toLocaleDateString()}</TableCell>
                       <TableCell className="space-x-1 whitespace-nowrap">
                         <Button variant="ghost" size="icon" aria-label="Edit user" disabled> {/* Edit disabled for now */}
@@ -152,10 +142,13 @@ export default function UserManagementPage() {
               <div className="text-center py-10">
                 <UserX className="mx-auto h-12 w-12 text-muted-foreground" />
                 <h3 className="mt-2 text-sm font-medium text-foreground">
-                  {users.length > 0 ? 'No users found matching your search.' : 'No users available.'}
+                  {users.length > 0 ? 'No users found matching your search.' : 'No users with order history found.'}
                 </h3>
                 {users.length === 0 && !isLoading && !error && (
-                    <p className="mt-1 text-sm text-muted-foreground">There are currently no users in the system.</p>
+                    <p className="mt-1 text-sm text-muted-foreground">There are currently no users with order history in the system.</p>
+                )}
+                 {users.length === 0 && error && (
+                    <p className="mt-1 text-sm text-muted-foreground">Could not load user data due to an error.</p>
                 )}
               </div>
             )}
@@ -165,3 +158,4 @@ export default function UserManagementPage() {
     </div>
   );
 }
+
