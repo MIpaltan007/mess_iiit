@@ -12,29 +12,20 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { PlusCircle, Edit, Trash2, Utensils, ArrowLeft, Carrot, Leaf, Fish, WheatOff } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Utensils, ArrowLeft, Carrot, Leaf, Fish, WheatOff, Loader2, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect, FormEvent } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { getMenuItems, addMenuItem, updateMenuItem, deleteMenuItem, type MenuItem, type MenuItemData, type DietaryTag } from "@/services/menuService";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-type DietaryTag = 'Vegetarian' | 'Vegan' | 'Gluten-Free' | 'Non-Veg';
 
 const ALL_DIETARY_TAGS: DietaryTag[] = ['Vegetarian', 'Vegan', 'Gluten-Free', 'Non-Veg'];
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const MEAL_TYPES: MenuItem['mealType'][] = ['Breakfast', 'Lunch', 'Dinner'];
 
-export interface MenuItem {
-  id: string;
-  day: string;
-  mealType: 'Breakfast' | 'Lunch' | 'Dinner';
-  name: string;
-  description: string;
-  dietaryTags: DietaryTag[];
-  calories: number;
-  price: number;
-}
-
-const getPrice = (mealType: 'Breakfast' | 'Lunch' | 'Dinner'): number => {
+const getPriceSuggestion = (mealType: 'Breakfast' | 'Lunch' | 'Dinner'): number => {
   switch (mealType) {
     case 'Breakfast': return 25;
     case 'Lunch': return 45;
@@ -43,24 +34,6 @@ const getPrice = (mealType: 'Breakfast' | 'Lunch' | 'Dinner'): number => {
   }
 };
 
-const initialMenuData: Omit<MenuItem, 'price'>[] = [
-  { id: '1', day: 'Monday', mealType: 'Breakfast', name: 'Scrambled Eggs & Toast', description: 'Classic scrambled eggs with whole wheat toast.', dietaryTags: ['Non-Veg'], calories: 350 },
-  { id: '2', day: 'Monday', mealType: 'Lunch', name: 'Chicken Salad Sandwich', description: 'Grilled chicken salad on multigrain bread.', dietaryTags: ['Non-Veg'], calories: 550 },
-  { id: '3', day: 'Monday', mealType: 'Dinner', name: 'Lentil Soup', description: 'Hearty lentil soup with vegetables.', dietaryTags: ['Vegan', 'Vegetarian', 'Gluten-Free'], calories: 400 },
-  { id: '4', day: 'Tuesday', mealType: 'Breakfast', name: 'Oatmeal with Berries', description: 'Warm oatmeal topped with mixed berries and nuts.', dietaryTags: ['Vegan', 'Vegetarian', 'Gluten-Free'], calories: 300 },
-  { id: '5', day: 'Tuesday', mealType: 'Lunch', name: 'Quinoa Salad', description: 'Refreshing quinoa salad with cucumber, tomatoes, and feta.', dietaryTags: ['Vegetarian', 'Gluten-Free'], calories: 450 },
-  { id: '6', day: 'Tuesday', mealType: 'Dinner', name: 'Grilled Salmon', description: 'Salmon fillet grilled to perfection with roasted asparagus.', dietaryTags: ['Non-Veg', 'Gluten-Free'], calories: 600 },
-   // ... Add more items for Wednesday to Sunday if desired, or they can be added via the UI
-  { id: '7', day: 'Wednesday', mealType: 'Breakfast', name: 'Pancakes', description: 'Fluffy pancakes with maple syrup.', dietaryTags: ['Vegetarian'], calories: 450 },
-  { id: '8', day: 'Wednesday', mealType: 'Lunch', name: 'Vegetable Stir-fry', description: 'Mixed vegetables stir-fried with tofu and soy sauce.', dietaryTags: ['Vegan', 'Vegetarian'], calories: 500 },
-  { id: '9', day: 'Wednesday', mealType: 'Dinner', name: 'Spaghetti Bolognese', description: 'Classic spaghetti with a rich meat sauce.', dietaryTags: ['Non-Veg'], calories: 650 },
-];
-
-const menuDataWithPrices: MenuItem[] = initialMenuData.map(item => ({
-  ...item,
-  price: getPrice(item.mealType),
-}));
-
 const dietaryTagIcons: Record<DietaryTag, React.ReactElement> = {
   'Vegetarian': <Leaf className="h-4 w-4 text-green-500" />,
   'Vegan': <Carrot className="h-4 w-4 text-orange-500" />,
@@ -68,34 +41,56 @@ const dietaryTagIcons: Record<DietaryTag, React.ReactElement> = {
   'Non-Veg': <Fish className="h-4 w-4 text-blue-500" />,
 };
 
-const defaultNewItem: Omit<MenuItem, 'id'> = {
+const defaultNewItemForm: Omit<MenuItem, 'id'> = {
   day: 'Monday',
   mealType: 'Breakfast',
   name: '',
   description: '',
   dietaryTags: [],
   calories: 0,
-  price: getPrice('Breakfast'),
+  price: getPriceSuggestion('Breakfast'),
 };
 
 
 export default function MenuManagementPage() {
-  const [menuItems, setMenuItems] = useState<MenuItem[]>(menuDataWithPrices);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [formSubmitting, setFormSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<MenuItem | null>(null); // Item being edited
-  const [currentItemForm, setCurrentItemForm] = useState<Omit<MenuItem, 'id'>>(defaultNewItem); // Form state
+  const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+  const [currentItemForm, setCurrentItemForm] = useState<Omit<MenuItem, 'id'>>(defaultNewItemForm);
   const [itemToDelete, setItemToDelete] = useState<MenuItem | null>(null);
   const { toast } = useToast();
 
+  const fetchMenuItems = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const items = await getMenuItems();
+      setMenuItems(items);
+    } catch (err) {
+      console.error("Failed to fetch menu items:", err);
+      setError("Failed to load menu items. Please try again.");
+      toast({ title: "Error", description: "Could not fetch menu items.", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMenuItems();
+  }, []);
+
   const handleAddNewClick = () => {
     setEditingItem(null);
-    setCurrentItemForm({ ...defaultNewItem, price: getPrice(defaultNewItem.mealType) });
+    setCurrentItemForm({ ...defaultNewItemForm, price: getPriceSuggestion(defaultNewItemForm.mealType) });
     setIsFormOpen(true);
   };
 
   const handleEditClick = (item: MenuItem) => {
     setEditingItem(item);
-    setCurrentItemForm({ ...item });
+    setCurrentItemForm({ ...item }); // item includes id, but form is Omit<MenuItem, 'id'>, this is fine.
     setIsFormOpen(true);
   };
 
@@ -103,11 +98,16 @@ export default function MenuManagementPage() {
     setItemToDelete(item);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (itemToDelete) {
-      setMenuItems(prevItems => prevItems.filter(item => item.id !== itemToDelete.id));
-      toast({ title: "Item Deleted", description: `${itemToDelete.name} has been removed from the menu.` });
-      setItemToDelete(null);
+      try {
+        await deleteMenuItem(itemToDelete.id);
+        toast({ title: "Item Deleted", description: `${itemToDelete.name} has been removed.` });
+        setItemToDelete(null);
+        fetchMenuItems(); // Re-fetch to update list
+      } catch (err) {
+        toast({ title: "Error", description: `Failed to delete ${itemToDelete.name}.`, variant: "destructive" });
+      }
     }
   };
 
@@ -123,7 +123,7 @@ export default function MenuManagementPage() {
     setCurrentItemForm(prev => {
         const updatedForm = { ...prev, [name]: value };
         if (name === 'mealType') {
-            updatedForm.price = getPrice(value as MenuItem['mealType']);
+            updatedForm.price = getPriceSuggestion(value as MenuItem['mealType']);
         }
         return updatedForm;
     });
@@ -138,7 +138,7 @@ export default function MenuManagementPage() {
     });
   };
 
-  const handleSubmitForm = (e: FormEvent) => {
+  const handleSubmitForm = async (e: FormEvent) => {
     e.preventDefault();
     if (!currentItemForm.name.trim()) {
         toast({ title: "Validation Error", description: "Item name cannot be empty.", variant: "destructive" });
@@ -149,18 +149,26 @@ export default function MenuManagementPage() {
         return;
     }
 
-    if (editingItem) { // Edit mode
-      setMenuItems(prevItems => prevItems.map(item => item.id === editingItem.id ? { ...currentItemForm, id: editingItem.id } : item));
-      toast({ title: "Item Updated", description: `${currentItemForm.name} has been successfully updated.` });
-    } else { // Add mode
-      const newItemWithId: MenuItem = { ...currentItemForm, id: String(Date.now()) };
-      setMenuItems(prevItems => [...prevItems, newItemWithId]);
-      toast({ title: "Item Added", description: `${currentItemForm.name} has been successfully added.` });
-    }
-    setIsFormOpen(false);
-    setEditingItem(null);
-  };
+    setFormSubmitting(true);
+    const itemDataToSave: MenuItemData = { ...currentItemForm };
 
+    try {
+      if (editingItem) { // Edit mode
+        await updateMenuItem(editingItem.id, itemDataToSave);
+        toast({ title: "Item Updated", description: `${currentItemForm.name} has been successfully updated.` });
+      } else { // Add mode
+        await addMenuItem(itemDataToSave);
+        toast({ title: "Item Added", description: `${currentItemForm.name} has been successfully added.` });
+      }
+      setIsFormOpen(false);
+      setEditingItem(null);
+      fetchMenuItems(); // Re-fetch to update list
+    } catch (err) {
+      toast({ title: "Error", description: "Failed to save item. Please try again.", variant: "destructive" });
+    } finally {
+      setFormSubmitting(false);
+    }
+  };
 
   return (
     <div className="flex min-h-screen bg-secondary">
@@ -186,12 +194,20 @@ export default function MenuManagementPage() {
       <main className="flex-1 p-8 space-y-8">
         <header className="flex justify-between items-center">
           <h2 className="text-3xl font-semibold text-primary">Menu Management</h2>
-          <Button onClick={handleAddNewClick}>
+          <Button onClick={handleAddNewClick} disabled={isLoading}>
             <PlusCircle className="mr-2 h-5 w-5" /> Add New Item
           </Button>
         </header>
 
-        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error Loading Menu</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        <Dialog open={isFormOpen} onOpenChange={(open) => { if (!formSubmitting) setIsFormOpen(open); }}>
           <DialogContent className="sm:max-w-lg">
             <form onSubmit={handleSubmitForm}>
               <DialogHeader>
@@ -203,33 +219,33 @@ export default function MenuManagementPage() {
               <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="name" className="text-right">Name</Label>
-                  <Input id="name" name="name" value={currentItemForm.name} onChange={handleFormInputChange} className="col-span-3" required />
+                  <Input id="name" name="name" value={currentItemForm.name} onChange={handleFormInputChange} className="col-span-3" required disabled={formSubmitting} />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="description" className="text-right">Description</Label>
-                  <Textarea id="description" name="description" value={currentItemForm.description} onChange={handleFormInputChange} className="col-span-3" />
+                  <Textarea id="description" name="description" value={currentItemForm.description} onChange={handleFormInputChange} className="col-span-3" disabled={formSubmitting} />
                 </div>
                  <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="day" className="text-right">Day</Label>
-                  <Select name="day" value={currentItemForm.day} onValueChange={(value) => handleSelectChange('day', value)}>
+                  <Select name="day" value={currentItemForm.day} onValueChange={(value) => handleSelectChange('day', value)} disabled={formSubmitting}>
                     <SelectTrigger className="col-span-3"> <SelectValue placeholder="Select day" /> </SelectTrigger>
                     <SelectContent> {DAYS_OF_WEEK.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)} </SelectContent>
                   </Select>
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="mealType" className="text-right">Meal Type</Label>
-                  <Select name="mealType" value={currentItemForm.mealType} onValueChange={(value) => handleSelectChange('mealType', value)}>
+                  <Select name="mealType" value={currentItemForm.mealType} onValueChange={(value) => handleSelectChange('mealType', value)} disabled={formSubmitting}>
                     <SelectTrigger className="col-span-3"> <SelectValue placeholder="Select meal type" /> </SelectTrigger>
                     <SelectContent> {MEAL_TYPES.map(mt => <SelectItem key={mt} value={mt}>{mt}</SelectItem>)} </SelectContent>
                   </Select>
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="calories" className="text-right">Calories</Label>
-                  <Input id="calories" name="calories" type="number" value={currentItemForm.calories} onChange={handleFormInputChange} className="col-span-3" min="0" />
+                  <Input id="calories" name="calories" type="number" value={currentItemForm.calories} onChange={handleFormInputChange} className="col-span-3" min="0" disabled={formSubmitting} />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="price" className="text-right">Price (₹)</Label>
-                  <Input id="price" name="price" type="number" value={currentItemForm.price} onChange={handleFormInputChange} className="col-span-3" min="0" step="0.01" />
+                  <Input id="price" name="price" type="number" value={currentItemForm.price} onChange={handleFormInputChange} className="col-span-3" min="0" step="0.01" disabled={formSubmitting} />
                 </div>
                 <div className="grid grid-cols-4 items-start gap-4">
                   <Label className="text-right pt-2">Dietary Tags</Label>
@@ -240,6 +256,7 @@ export default function MenuManagementPage() {
                           id={`dietary-${tag}`}
                           checked={currentItemForm.dietaryTags.includes(tag)}
                           onCheckedChange={(checked) => handleDietaryTagChange(tag, !!checked)}
+                          disabled={formSubmitting}
                         />
                         <Label htmlFor={`dietary-${tag}`} className="font-normal flex items-center gap-1">
                           {dietaryTagIcons[tag]} {tag}
@@ -251,9 +268,12 @@ export default function MenuManagementPage() {
               </div>
               <DialogFooter>
                 <DialogClose asChild>
-                    <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>Cancel</Button>
+                    <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)} disabled={formSubmitting}>Cancel</Button>
                 </DialogClose>
-                <Button type="submit">{editingItem ? 'Save Changes' : 'Add Item'}</Button>
+                <Button type="submit" disabled={formSubmitting}>
+                  {formSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  {editingItem ? 'Save Changes' : 'Add Item'}
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -277,10 +297,14 @@ export default function MenuManagementPage() {
         <Card>
           <CardHeader>
             <CardTitle>Current Menu Items</CardTitle>
-            <CardDescription>View, edit, or delete existing menu items.</CardDescription>
+            <CardDescription>View, edit, or delete existing menu items. Changes will reflect on the user-facing menu.</CardDescription>
           </CardHeader>
           <CardContent>
-            {menuItems.length > 0 ? (
+            {isLoading ? (
+              <div className="space-y-2">
+                {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+              </div>
+            ) : menuItems.length > 0 ? (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -326,7 +350,9 @@ export default function MenuManagementPage() {
                 </TableBody>
               </Table>
             ) : (
-                 <p className="text-center text-muted-foreground py-4">No menu items available. Click "Add New Item" to get started.</p>
+                 <p className="text-center text-muted-foreground py-4">
+                   {error ? "Could not load menu items." : "No menu items available. Click \"Add New Item\" to get started."}
+                 </p>
             )}
           </CardContent>
         </Card>
@@ -334,4 +360,3 @@ export default function MenuManagementPage() {
     </div>
   );
 }
-

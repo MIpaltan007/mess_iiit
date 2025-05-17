@@ -9,26 +9,25 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Carrot, Leaf, Fish, WheatOff } from 'lucide-react';
+import { Carrot, Leaf, Fish, WheatOff, AlertCircle, Loader2 } from 'lucide-react'; // Added Loader2, AlertCircle
 import type { User as FirebaseUser } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import type { UserProfile, UserRole } from '@/services/userService'; // Import UserProfile and UserRole
+import type { UserProfile, UserRole } from '@/services/userService';
+import { getMenuItems, type MenuItem as MenuItemFromService, type DietaryTag as DietaryTagFromService } from '@/services/menuService'; // Import from menuService
+import { Skeleton } from '@/components/ui/skeleton'; // Added Skeleton
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'; // Added Alert
 
-export interface MenuItem {
-  id: string;
-  day: string;
-  mealType: 'Breakfast' | 'Lunch' | 'Dinner';
-  name: string;
-  description: string;
-  dietaryTags: DietaryTag[];
-  calories: number;
-  price: number; // Price will now be dynamically set based on role
+// Re-export or use DietaryTagFromService directly
+export type DietaryTag = DietaryTagFromService;
+
+// MenuItem for display will include the dynamically calculated price
+export interface MenuItem extends MenuItemFromService {
+  // price here will be the role-adjusted display price
 }
 
-type DietaryTag = 'Vegetarian' | 'Vegan' | 'Gluten-Free' | 'Non-Veg';
-
-const getPrice = (mealType: 'Breakfast' | 'Lunch' | 'Dinner', role: UserRole | null | undefined): number => {
+// This function determines the final display price based on meal type and user role
+const getDisplayPrice = (mealType: 'Breakfast' | 'Lunch' | 'Dinner', role: UserRole | null | undefined): number => {
   if (role === 'Staff') {
     switch (mealType) {
       case 'Breakfast': return 20;
@@ -46,31 +45,6 @@ const getPrice = (mealType: 'Breakfast' | 'Lunch' | 'Dinner', role: UserRole | n
   }
 };
 
-// Base menu data without prices
-const initialMenuDataTemplate: Omit<MenuItem, 'price'>[] = [
-  { id: '1', day: 'Monday', mealType: 'Breakfast', name: 'Scrambled Eggs & Toast', description: 'Classic scrambled eggs with whole wheat toast.', dietaryTags: ['Non-Veg'], calories: 350 },
-  { id: '2', day: 'Monday', mealType: 'Lunch', name: 'Chicken Salad Sandwich', description: 'Grilled chicken salad on multigrain bread.', dietaryTags: ['Non-Veg'], calories: 550 },
-  { id: '3', day: 'Monday', mealType: 'Dinner', name: 'Lentil Soup', description: 'Hearty lentil soup with vegetables.', dietaryTags: ['Vegan', 'Vegetarian', 'Gluten-Free'], calories: 400 },
-  { id: '4', day: 'Tuesday', mealType: 'Breakfast', name: 'Oatmeal with Berries', description: 'Warm oatmeal topped with mixed berries and nuts.', dietaryTags: ['Vegan', 'Vegetarian', 'Gluten-Free'], calories: 300 },
-  { id: '5', day: 'Tuesday', mealType: 'Lunch', name: 'Quinoa Salad', description: 'Refreshing quinoa salad with cucumber, tomatoes, and feta.', dietaryTags: ['Vegetarian', 'Gluten-Free'], calories: 450 },
-  { id: '6', day: 'Tuesday', mealType: 'Dinner', name: 'Grilled Salmon', description: 'Salmon fillet grilled to perfection with roasted asparagus.', dietaryTags: ['Non-Veg', 'Gluten-Free'], calories: 600 },
-  { id: '7', day: 'Wednesday', mealType: 'Breakfast', name: 'Pancakes', description: 'Fluffy pancakes with maple syrup.', dietaryTags: ['Vegetarian'], calories: 450 },
-  { id: '8', day: 'Wednesday', mealType: 'Lunch', name: 'Vegetable Stir-fry', description: 'Mixed vegetables stir-fried with tofu and soy sauce.', dietaryTags: ['Vegan', 'Vegetarian'], calories: 500 },
-  { id: '9', day: 'Wednesday', mealType: 'Dinner', name: 'Spaghetti Bolognese', description: 'Classic spaghetti with a rich meat sauce.', dietaryTags: ['Non-Veg'], calories: 650 },
-  { id: '10', day: 'Thursday', mealType: 'Breakfast', name: 'Yogurt Parfait', description: 'Greek yogurt with granola and fresh fruits.', dietaryTags: ['Vegetarian'], calories: 320 },
-  { id: '11', day: 'Thursday', mealType: 'Lunch', name: 'Turkey Club Sandwich', description: 'Triple-decker sandwich with turkey, bacon, lettuce, and tomato.', dietaryTags: ['Non-Veg'], calories: 600 },
-  { id: '12', day: 'Thursday', mealType: 'Dinner', name: 'Beef Tacos', description: 'Seasoned ground beef in crispy taco shells with toppings.', dietaryTags: ['Non-Veg'], calories: 550 },
-  { id: '13', day: 'Friday', mealType: 'Breakfast', name: 'Smoothie Bowl', description: 'Blended açai with banana, berries, and coconut flakes.', dietaryTags: ['Vegan', 'Vegetarian', 'Gluten-Free'], calories: 380 },
-  { id: '14', day: 'Friday', mealType: 'Lunch', name: 'Fish and Chips', description: 'Battered cod fillets with a side of crispy fries.', dietaryTags: ['Non-Veg'], calories: 700 },
-  { id: '15', day: 'Friday', mealType: 'Dinner', name: 'Margherita Pizza', description: 'Classic pizza with tomatoes, mozzarella, and basil.', dietaryTags: ['Vegetarian'], calories: 620 },
-  { id: '16', day: 'Saturday', mealType: 'Breakfast', name: 'Waffles with Syrup', description: 'Crispy Belgian waffles served with butter and maple syrup.', dietaryTags: ['Vegetarian'], calories: 480 },
-  { id: '17', day: 'Saturday', mealType: 'Lunch', name: 'BBQ Pulled Pork Sandwich', description: 'Slow-cooked pulled pork in BBQ sauce on a brioche bun.', dietaryTags: ['Non-Veg'], calories: 650 },
-  { id: '18', day: 'Saturday', mealType: 'Dinner', name: 'Chicken Alfredo', description: 'Creamy Alfredo pasta with grilled chicken breast.', dietaryTags: ['Non-Veg'], calories: 720 },
-  { id: '19', day: 'Sunday', mealType: 'Breakfast', name: 'French Toast', description: 'Thick-cut bread dipped in egg batter, served with berries.', dietaryTags: ['Vegetarian'], calories: 420 },
-  { id: '20', day: 'Sunday', mealType: 'Lunch', name: 'Roast Chicken with Vegetables', description: 'Herb-roasted chicken with seasonal vegetables.', dietaryTags: ['Non-Veg', 'Gluten-Free'], calories: 600 },
-  { id: '21', day: 'Sunday', mealType: 'Dinner', name: 'Shepherd\'s Pie', description: 'Ground lamb and vegetables topped with mashed potatoes.', dietaryTags: ['Non-Veg'], calories: 680 },
-];
-
 const dietaryTagIcons: Record<DietaryTag, React.ReactElement> = {
   'Vegetarian': <Leaf className="h-4 w-4 text-green-500" />,
   'Vegan': <Carrot className="h-4 w-4 text-orange-500" />,
@@ -82,30 +56,53 @@ const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Sat
 
 interface MenuDisplayProps {
   currentUser: FirebaseUser | null;
-  currentUserProfile: UserProfile | null; // Added to get role
+  currentUserProfile: UserProfile | null;
   onMealSelect: (meal: MenuItem, isSelected: boolean) => void;
   selectedMeals: MenuItem[];
 }
 
 export const MenuDisplay: FC<MenuDisplayProps> = ({ currentUser, currentUserProfile, onMealSelect, selectedMeals }) => {
+  const [menuItemsFromFirestore, setMenuItemsFromFirestore] = useState<MenuItemFromService[]>([]);
+  const [isLoadingMenu, setIsLoadingMenu] = useState(true);
+  const [menuError, setMenuError] = useState<string | null>(null);
+  
   const [filter, setFilter] = useState<DietaryTag | 'All'>('All');
   const [selectedDay, setSelectedDay] = useState<string>('Monday');
   const { toast } = useToast();
 
-  const menuDataWithDynamicPrices = useMemo(() => {
-    const role = currentUserProfile?.role || null; // Default to student prices if no role
-    return initialMenuDataTemplate.map(item => ({
-      ...item,
-      price: getPrice(item.mealType, role),
+  useEffect(() => {
+    const fetchMenu = async () => {
+      setIsLoadingMenu(true);
+      setMenuError(null);
+      try {
+        const items = await getMenuItems();
+        setMenuItemsFromFirestore(items);
+      } catch (err) {
+        console.error("Failed to fetch menu for display:", err);
+        setMenuError("Could not load the menu. Please try refreshing the page.");
+        toast({ title: "Error", description: "Failed to load menu items.", variant: "destructive" });
+      } finally {
+        setIsLoadingMenu(false);
+      }
+    };
+    fetchMenu();
+  }, [toast]);
+
+  // Calculate display prices based on fetched items and user role
+  const menuItemsForDisplay: MenuItem[] = useMemo(() => {
+    const role = currentUserProfile?.role || null;
+    return menuItemsFromFirestore.map(item => ({
+      ...item, // item already has base details like name, description, calories, dietaryTags, and its original admin-set price
+      price: getDisplayPrice(item.mealType, role), // Override price with role-specific display price
     }));
-  }, [currentUserProfile]);
+  }, [menuItemsFromFirestore, currentUserProfile]);
 
 
   const filteredMenu = useMemo(() => {
-    return menuDataWithDynamicPrices
+    return menuItemsForDisplay
       .filter(item => item.day === selectedDay)
       .filter(item => filter === 'All' || item.dietaryTags.includes(filter));
-  }, [menuDataWithDynamicPrices, filter, selectedDay]);
+  }, [menuItemsForDisplay, filter, selectedDay]);
 
   const handleDayChange = (day: string) => {
     setSelectedDay(day);
@@ -143,12 +140,13 @@ export const MenuDisplay: FC<MenuDisplayProps> = ({ currentUser, currentUserProf
                 variant={selectedDay === day ? 'default' : 'outline'}
                 onClick={() => handleDayChange(day)}
                 className="capitalize"
+                disabled={isLoadingMenu}
               >
                 {day}
               </Button>
             ))}
           </div>
-          <Select onValueChange={handleFilterChange} defaultValue="All">
+          <Select onValueChange={handleFilterChange} defaultValue="All" disabled={isLoadingMenu}>
             <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="Filter by diet" />
             </SelectTrigger>
@@ -162,7 +160,17 @@ export const MenuDisplay: FC<MenuDisplayProps> = ({ currentUser, currentUserProf
           </Select>
         </div>
 
-        {filteredMenu.length > 0 ? (
+        {isLoadingMenu ? (
+          <div className="space-y-2">
+            {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+          </div>
+        ) : menuError ? (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error Loading Menu</AlertTitle>
+            <AlertDescription>{menuError}</AlertDescription>
+          </Alert>
+        ) : filteredMenu.length > 0 ? (
           <Table>
             <TableHeader>
               <TableRow>
@@ -182,7 +190,7 @@ export const MenuDisplay: FC<MenuDisplayProps> = ({ currentUser, currentUserProf
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">{item.mealType}</TableCell>
                     <TableCell>{item.name}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{item.description}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground max-w-xs truncate">{item.description}</TableCell>
                     <TableCell>
                       <div className="flex gap-1 flex-wrap">
                         {item.dietaryTags.map(tag => (
@@ -209,7 +217,9 @@ export const MenuDisplay: FC<MenuDisplayProps> = ({ currentUser, currentUserProf
             </TableBody>
           </Table>
         ) : (
-          <p className="text-center text-muted-foreground py-4">No meals match your current filter for {selectedDay}.</p>
+          <p className="text-center text-muted-foreground py-4">
+            {menuItemsFromFirestore.length === 0 ? "The menu is currently empty." : `No meals match your current filter for ${selectedDay}.`}
+          </p>
         )}
       </CardContent>
     </Card>
