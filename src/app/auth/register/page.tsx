@@ -87,7 +87,7 @@ export default function RegisterPage() {
             <UtensilsCrossed className="h-12 w-12 text-primary" />
           </div>
           <CardTitle className="text-3xl font-bold text-primary">Create Account</CardTitle>
-          <CardDescription>Join Meal Plan Hub today!</CardDescription>
+          <CardDescription>Join IIIT Mess today!</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
