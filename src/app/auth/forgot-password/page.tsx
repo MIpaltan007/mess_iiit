@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -15,49 +16,87 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { UtensilsCrossed, Mail } from 'lucide-react';
+import { UtensilsCrossed, Mail, KeyRound, CheckCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { getAuth, fetchSignInMethodsForEmail } from 'firebase/auth';
+import { app } from '@/services/firebase';
 
-const forgotPasswordFormSchema = z.object({
+const emailCheckFormSchema = z.object({
   email: z.string().email({ message: 'Invalid email address.' }),
 });
+type EmailCheckFormValues = z.infer<typeof emailCheckFormSchema>;
 
-type ForgotPasswordFormValues = z.infer<typeof forgotPasswordFormSchema>;
+const passwordResetFormSchema = z.object({
+  newPassword: z.string().min(6, { message: 'Password must be at least 6 characters.' }),
+  confirmPassword: z.string(),
+}).refine(data => data.newPassword === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ['confirmPassword'],
+});
+type PasswordResetFormValues = z.infer<typeof passwordResetFormSchema>;
 
 export default function ForgotPasswordPage() {
   const { toast } = useToast();
   const router = useRouter();
+  const [stage, setStage] = useState<'checkEmail' | 'resetPassword'>('checkEmail');
+  const [validatedEmail, setValidatedEmail] = useState<string | null>(null);
+  const [isCheckingEmail, setIsCheckingEmail] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
 
-  const form = useForm<ForgotPasswordFormValues>({
-    resolver: zodResolver(forgotPasswordFormSchema),
+  const emailForm = useForm<EmailCheckFormValues>({
+    resolver: zodResolver(emailCheckFormSchema),
     defaultValues: {
       email: '',
     },
   });
 
-  async function onSubmit(values: ForgotPasswordFormValues) {
-    // Simulate API call for password reset request
-    console.log('Password reset requested for:', values.email);
-    // In a real app, you would call your backend API here.
-    // For example:
-    // try {
-    //   const response = await fetch('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify(values) });
-    //   if (response.ok) {
-    //     toast({ title: 'Password Reset Email Sent', description: 'Please check your email for instructions.' });
-    //     router.push('/auth/login'); 
-    //   } else {
-    //     const errorData = await response.json();
-    //     toast({ title: 'Request Failed', description: errorData.message || 'Could not process request.', variant: 'destructive' });
-    //   }
-    // } catch (error) {
-    //   toast({ title: 'Error', description: 'An unexpected error occurred.', variant: 'destructive' });
-    // }
+  const passwordForm = useForm<PasswordResetFormValues>({
+    resolver: zodResolver(passwordResetFormSchema),
+    defaultValues: {
+      newPassword: '',
+      confirmPassword: '',
+    },
+  });
 
-    // Mock success
-    toast({ title: 'Password Reset Email Sent', description: 'If an account exists for this email, you will receive reset instructions.' });
-    // Don't redirect immediately to avoid confirming if an email exists for security.
-    // form.reset(); // Optionally reset form
+  async function handleEmailCheck(values: EmailCheckFormValues) {
+    setIsCheckingEmail(true);
+    const auth = getAuth(app);
+    try {
+      const methods = await fetchSignInMethodsForEmail(auth, values.email);
+      if (methods.length > 0) {
+        setValidatedEmail(values.email);
+        setStage('resetPassword');
+        toast({ title: 'Email Verified', description: 'Please enter your new password.', icon: <CheckCircle className="h-5 w-5 text-green-500" /> });
+      } else {
+        toast({ title: 'Email Not Found', description: 'Email-ID not registered in our database.', variant: 'destructive' });
+      }
+    } catch (error: any) {
+      console.error("Error checking email:", error);
+      toast({ title: 'Error', description: 'An unexpected error occurred while checking your email.', variant: 'destructive' });
+    } finally {
+      setIsCheckingEmail(false);
+    }
+  }
+
+  async function handlePasswordReset(values: PasswordResetFormValues) {
+    if (!validatedEmail) return; // Should not happen if stage is correct
+
+    setIsResettingPassword(true);
+    // ** IMPORTANT SIMULATION NOTE **
+    // Directly updating a user's password without current authentication or a reset token
+    // is not possible with client-side Firebase SDKs for security reasons.
+    // A real implementation of this specific flow would require a backend (e.g., Firebase Cloud Function with Admin SDK).
+    // This section simulates a successful password update.
+    console.log(`SIMULATING password update for ${validatedEmail} with new password: ${values.newPassword}`);
+    
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    toast({ title: 'Password Updated (Simulated)', description: 'Your password has been successfully updated. Please log in.', icon: <CheckCircle className="h-5 w-5 text-green-500" /> });
+    setIsResettingPassword(false);
+    router.push('/auth/login');
   }
 
   return (
@@ -67,30 +106,74 @@ export default function ForgotPasswordPage() {
           <div className="flex justify-center items-center mb-4">
             <UtensilsCrossed className="h-12 w-12 text-primary" />
           </div>
-          <CardTitle className="text-3xl font-bold text-primary">Forgot Password?</CardTitle>
-          <CardDescription>Enter your email to receive reset instructions.</CardDescription>
+          <CardTitle className="text-3xl font-bold text-primary">
+            {stage === 'checkEmail' ? 'Forgot Password?' : 'Reset Password'}
+          </CardTitle>
+          <CardDescription>
+            {stage === 'checkEmail' 
+              ? 'Enter your email to check if it\'s registered.' 
+              : `Enter a new password for ${validatedEmail}.`}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input type="email" placeholder="your.email@example.com" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
-                <Mail className="mr-2 h-5 w-5" /> Send Reset Link
-              </Button>
-            </form>
-          </Form>
+          {stage === 'checkEmail' ? (
+            <Form {...emailForm}>
+              <form onSubmit={emailForm.handleSubmit(handleEmailCheck)} className="space-y-6">
+                <FormField
+                  control={emailForm.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="your.email@example.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isCheckingEmail}>
+                  {isCheckingEmail ? <Loader2 className="animate-spin" /> : <Mail className="mr-2 h-5 w-5" />}
+                  {isCheckingEmail ? 'Checking...' : 'Check Email'}
+                </Button>
+              </form>
+            </Form>
+          ) : (
+            <Form {...passwordForm}>
+              <form onSubmit={passwordForm.handleSubmit(handlePasswordReset)} className="space-y-6">
+                <FormField
+                  control={passwordForm.control}
+                  name="newPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>New Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="••••••••" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={passwordForm.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Confirm New Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="••••••••" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isResettingPassword}>
+                  {isResettingPassword ? <Loader2 className="animate-spin" /> : <KeyRound className="mr-2 h-5 w-5" />}
+                  {isResettingPassword ? 'Resetting...' : 'Reset Password'}
+                </Button>
+              </form>
+            </Form>
+          )}
         </CardContent>
         <CardFooter className="flex flex-col items-center space-y-2">
           <p className="text-sm text-muted-foreground">
