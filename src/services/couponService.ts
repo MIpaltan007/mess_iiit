@@ -16,7 +16,7 @@ export interface CouponData {
 }
 
 export interface CouponValidationServiceResult {
-  couponId: string;
+  couponId: string; // This will be the code as entered, or as found in DB
   isValid: boolean; 
   message: string;
   details?: {
@@ -31,7 +31,8 @@ export interface CouponValidationServiceResult {
 /**
  * Validates a coupon code against Firestore.
  * If valid and usable, it marks the coupon as used.
- * @param couponCode The coupon code to validate.
+ * Uses the exact case of the coupon code entered.
+ * @param couponCode The coupon code to validate (case-sensitive).
  * @returns Promise<CouponValidationServiceResult>
  */
 export async function validateAndUseCoupon(couponCode: string): Promise<CouponValidationServiceResult> {
@@ -39,26 +40,27 @@ export async function validateAndUseCoupon(couponCode: string): Promise<CouponVa
     return { couponId: couponCode, isValid: false, message: 'Coupon code cannot be empty.' };
   }
 
-  const normalizedCouponCode = couponCode.toUpperCase();
-  const couponRef = doc(db, 'coupons', normalizedCouponCode); 
+  // Use couponCode directly for case-sensitive validation
+  const couponRef = doc(db, 'coupons', couponCode); 
 
   try {
     const docSnap = await getDoc(couponRef);
 
     if (!docSnap.exists()) {
       return {
-        couponId: normalizedCouponCode,
+        couponId: couponCode, // Use original couponCode as it was not found
         isValid: false,
         message: 'Coupon code is invalid or does not exist.',
       };
     }
 
+    // docSnap.id is the coupon code as it exists in Firestore (case-sensitive)
     const couponData = { id: docSnap.id, ...docSnap.data() } as CouponData;
 
     if (!couponData.isValid) {
       const usedAtDate = couponData.usedAt ? couponData.usedAt.toDate().toLocaleString() : 'an unknown date';
       return {
-        couponId: normalizedCouponCode,
+        couponId: couponData.id, // Use ID from DB (which is the case-sensitive coupon code)
         isValid: false,
         message: `Coupon has already been used on ${usedAtDate}.`,
         details: {
@@ -84,7 +86,7 @@ export async function validateAndUseCoupon(couponCode: string): Promise<CouponVa
 
 
     return {
-      couponId: normalizedCouponCode,
+      couponId: updatedCouponData.id, // Use ID from DB
       isValid: true,
       message: 'Coupon is valid and has been successfully redeemed.',
       details: {
@@ -97,13 +99,13 @@ export async function validateAndUseCoupon(couponCode: string): Promise<CouponVa
     };
   } catch (error: any) {
     console.error(
-      `Error validating coupon ${normalizedCouponCode}:`,
+      `Error validating coupon ${couponCode}:`, // Log original couponCode
       error.message,
       error.code ? `(Code: ${error.code})` : '',
       error.stack ? `\nStack: ${error.stack}` : ''
     );
     return {
-      couponId: normalizedCouponCode,
+      couponId: couponCode, // Use original couponCode in case of error
       isValid: false,
       message: 'An error occurred while validating the coupon. Please try again.',
     };
