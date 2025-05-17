@@ -1,30 +1,27 @@
+
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { QrCode, CheckCircle, XCircle, Utensils, ArrowLeft, ScanLine } from "lucide-react";
+import { QrCode, CheckCircle, XCircle, Utensils, ArrowLeft, ScanLine, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { validateAndUseCoupon, type CouponValidationServiceResult } from "@/services/couponService";
 
-// Mock coupon data - in a real app, this would come from a database
-const mockCoupons: Record<string, { userId: string, planName: string, mealType: 'Breakfast' | 'Lunch' | 'Dinner', isValid: boolean, usedAt?: string }> = {
-    "VALID123": { userId: "user1", planName: "Full Feast", mealType: "Lunch", isValid: true },
-    "USED456": { userId: "user2", planName: "Daily Delights", mealType: "Dinner", isValid: false, usedAt: "2024-07-20 18:30" },
-    "INVALID789": { userId: "user3", planName: "Basic Bites", mealType: "Breakfast", isValid: false }, // e.g., expired or non-existent
-};
-
+// Interface for displaying validation result on the page
 interface ValidationResult {
     couponId: string;
     isValid: boolean;
     message: string;
     details?: {
         userId: string;
-        planName: string;
-        mealType: string;
+        planName?: string;
+        mealType?: 'Breakfast' | 'Lunch' | 'Dinner';
         usedAt?: string;
+        description?: string;
     };
 }
 
@@ -32,87 +29,54 @@ export default function CouponValidationPage() {
     const { toast } = useToast();
     const [couponCode, setCouponCode] = useState('');
     const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
-    const [isScanning, setIsScanning] = useState(false);
-    const videoRef = useRef<HTMLVideoElement>(null); // For potential camera access
+    const [isLoading, setIsLoading] = useState(false);
 
-    const handleValidateCoupon = () => {
+    const handleValidateCoupon = async () => {
         if (!couponCode.trim()) {
             toast({ title: "Error", description: "Please enter a coupon code.", variant: "destructive" });
             setValidationResult(null);
             return;
         }
 
-        const coupon = mockCoupons[couponCode.toUpperCase()];
+        setIsLoading(true);
+        setValidationResult(null); // Clear previous result
 
-        if (coupon) {
-            if (coupon.isValid) {
-                setValidationResult({
-                    couponId: couponCode.toUpperCase(),
-                    isValid: true,
-                    message: "Coupon is valid and can be used.",
-                    details: { userId: coupon.userId, planName: coupon.planName, mealType: coupon.mealType }
-                });
-                // Simulate marking coupon as used
-                mockCoupons[couponCode.toUpperCase()].isValid = false;
-                mockCoupons[couponCode.toUpperCase()].usedAt = new Date().toLocaleString();
+        try {
+            const result: CouponValidationServiceResult = await validateAndUseCoupon(couponCode);
+            
+            // Map service result to page's ValidationResult
+            setValidationResult({
+                couponId: result.couponId,
+                isValid: result.isValid,
+                message: result.message,
+                details: result.details ? {
+                    userId: result.details.userId,
+                    planName: result.details.planName,
+                    mealType: result.details.mealType,
+                    usedAt: result.details.usedAt,
+                    description: result.details.description,
+                } : undefined,
+            });
+
+            if (result.isValid) {
+                toast({ title: "Success", description: result.message });
             } else {
-                setValidationResult({
-                    couponId: couponCode.toUpperCase(),
-                    isValid: false,
-                    message: `Coupon has already been used on ${coupon.usedAt}.`,
-                    details: { userId: coupon.userId, planName: coupon.planName, mealType: coupon.mealType, usedAt: coupon.usedAt }
-                });
+                toast({ title: "Validation Failed", description: result.message, variant: "destructive" });
             }
-        } else {
+
+        } catch (error) {
+            console.error("Error in handleValidateCoupon:", error);
+            toast({ title: "Error", description: "An unexpected error occurred during validation.", variant: "destructive" });
             setValidationResult({
                 couponId: couponCode.toUpperCase(),
                 isValid: false,
-                message: "Coupon code is invalid or does not exist."
+                message: "An unexpected error occurred. Check console for details."
             });
-        }
-        setCouponCode(''); // Clear input after validation
-    };
-
-    const startScan = async () => {
-        setIsScanning(true);
-        setValidationResult(null);
-        // Simulate QR scan after a delay and set a mock code
-        toast({ title: "Scanner Active", description: "Simulating QR code scan..." });
-        setTimeout(() => {
-            const mockScannedCode = Object.keys(mockCoupons)[Math.floor(Math.random() * Object.keys(mockCoupons).length)];
-            setCouponCode(mockScannedCode);
-            setIsScanning(false);
-            toast({ title: "Code Scanned", description: `Scanned code: ${mockScannedCode}. Press Validate.` });
-        }, 2000);
-
-        // Actual camera access (requires user permission & HTTPS):
-        // if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        //     try {
-        //         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-        //         if (videoRef.current) {
-        //             videoRef.current.srcObject = stream;
-        //         }
-        //         // Here you would integrate a QR library like jsQR or Zxing
-        //     } catch (err) {
-        //         console.error("Error accessing camera: ", err);
-        //         toast({ title: "Camera Error", description: "Could not access camera.", variant: "destructive" });
-        //         setIsScanning(false);
-        //     }
-        // } else {
-        //     toast({ title: "Unsupported", description: "QR scanning not supported on this browser/device.", variant: "destructive" });
-        //     setIsScanning(false);
-        // }
-    };
-
-    const stopScan = () => {
-        setIsScanning(false);
-        if (videoRef.current && videoRef.current.srcObject) {
-            const stream = videoRef.current.srcObject as MediaStream;
-            stream.getTracks().forEach(track => track.stop());
-            videoRef.current.srcObject = null;
+        } finally {
+            setIsLoading(false);
+            setCouponCode(''); // Clear input after validation attempt
         }
     };
-
 
   return (
     <div className="flex min-h-screen bg-secondary">
@@ -138,43 +102,30 @@ export default function CouponValidationPage() {
       <main className="flex-1 p-8 space-y-8">
         <header>
           <h2 className="text-3xl font-semibold text-primary">Coupon Validation</h2>
-          <p className="text-muted-foreground">Validate meal coupons in real-time.</p>
+          <p className="text-muted-foreground">Validate meal coupons in real-time by entering the code.</p>
         </header>
 
         <Card className="max-w-lg mx-auto">
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><ScanLine className="h-6 w-6"/> Validate Coupon</CardTitle>
-            <CardDescription>Enter coupon code manually or scan QR code.</CardDescription>
+            <CardDescription>Enter coupon code manually below.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {isScanning && (
-                <div className="bg-muted p-4 rounded-md text-center">
-                    <video ref={videoRef} className="w-full h-auto rounded-md border" autoPlay playsInline muted></video>
-                    <p className="text-sm text-muted-foreground mt-2">Align QR code within the frame.</p>
-                    <Button onClick={stopScan} variant="outline" className="mt-2">Cancel Scan</Button>
-                </div>
-            )}
-            
-            {!isScanning && (
-                 <div className="space-y-2">
-                    <Label htmlFor="couponCode">Coupon Code</Label>
-                    <div className="flex gap-2">
-                        <Input 
-                            id="couponCode" 
-                            placeholder="Enter or scan code" 
-                            value={couponCode}
-                            onChange={e => setCouponCode(e.target.value)}
-                            className="flex-grow"
-                        />
-                        <Button onClick={startScan} variant="outline" aria-label="Scan QR Code">
-                            <QrCode className="h-5 w-5" />
-                        </Button>
-                    </div>
-                </div>
-            )}
+            <div className="space-y-2">
+                <Label htmlFor="couponCode">Coupon Code</Label>
+                <Input 
+                    id="couponCode" 
+                    placeholder="Enter coupon code" 
+                    value={couponCode}
+                    onChange={e => setCouponCode(e.target.value)}
+                    className="flex-grow"
+                    disabled={isLoading}
+                />
+            </div>
 
-            <Button onClick={handleValidateCoupon} className="w-full" disabled={isScanning}>
-              Validate Coupon
+            <Button onClick={handleValidateCoupon} className="w-full" disabled={isLoading}>
+              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {isLoading ? "Validating..." : "Validate Coupon"}
             </Button>
 
             {validationResult && (
@@ -189,8 +140,9 @@ export default function CouponValidationPage() {
                   {validationResult.details && (
                     <>
                       <p><span className="font-semibold">User ID:</span> {validationResult.details.userId}</p>
-                      <p><span className="font-semibold">Plan:</span> {validationResult.details.planName}</p>
-                      <p><span className="font-semibold">Meal Type:</span> {validationResult.details.mealType}</p>
+                      {validationResult.details.planName && <p><span className="font-semibold">Plan/Details:</span> {validationResult.details.planName}</p>}
+                      {validationResult.details.mealType && <p><span className="font-semibold">Meal Type:</span> {validationResult.details.mealType}</p>}
+                      {validationResult.details.description && <p><span className="font-semibold">Description:</span> {validationResult.details.description}</p>}
                        {validationResult.details.usedAt && <p><span className="font-semibold">Used At:</span> {validationResult.details.usedAt}</p>}
                     </>
                   )}
