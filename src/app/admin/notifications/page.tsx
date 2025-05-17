@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bell, Send, History, Utensils, ArrowLeft } from "lucide-react";
+import { Bell, Send, History, Utensils, ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -19,9 +20,11 @@ interface SentNotification extends NotificationType {
   status: 'Sent' | 'Failed';
 }
 
+type RecipientOption = 'all' | 'specific' | 'group';
+
 export default function NotificationsPage() {
   const { toast } = useToast();
-  const [recipient, setRecipient] = useState<'all' | 'specific' | 'group'>('all');
+  const [recipientType, setRecipientType] = useState<RecipientOption>('all');
   const [specificRecipient, setSpecificRecipient] = useState('');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
@@ -34,22 +37,42 @@ export default function NotificationsPage() {
       return;
     }
 
-    let actualRecipient = "all_users@example.com"; // Placeholder for 'all'
-    if (recipient === 'specific' && specificRecipient.trim()) {
+    let actualRecipient: string;
+    let recipientDescription: string;
+
+    switch (recipientType) {
+      case 'all':
+        actualRecipient = "all_users@example.com"; // Placeholder for backend processing
+        recipientDescription = "All Users";
+        break;
+      case 'specific':
+        if (!specificRecipient.trim()) {
+          toast({ title: "Error", description: "Please enter a specific recipient email.", variant: "destructive" });
+          return;
+        }
         actualRecipient = specificRecipient;
-    } else if (recipient === 'specific' && !specificRecipient.trim()) {
-        toast({ title: "Error", description: "Please enter a specific recipient email.", variant: "destructive" });
+        recipientDescription = specificRecipient;
+        break;
+      case 'group':
+        actualRecipient = "group_expiring_coupons@example.com"; // Placeholder for backend processing
+        recipientDescription = "User Group (Expiring Coupons)";
+        break;
+      default:
+        toast({ title: "Error", description: "Invalid recipient type selected.", variant: "destructive" });
         return;
     }
-    // Group logic would be more complex, involving fetching users in a group.
 
     setIsLoading(true);
     const notificationData: NotificationType = { recipient: actualRecipient, subject, body };
     
     try {
+        // In a real app, sendNotification would interact with a backend service.
+        // For now, it's a mock. The `recipient` field here would be used by the backend.
         const result: NotificationResult = await sendNotification(notificationData);
+        
         const newSentNotification: SentNotification = {
             ...notificationData,
+            recipient: recipientDescription, // Use the descriptive recipient for display
             id: String(Date.now()), // simple ID for demo
             sentAt: new Date(),
             status: result.success ? 'Sent' : 'Failed',
@@ -57,16 +80,25 @@ export default function NotificationsPage() {
         setSentNotifications(prev => [newSentNotification, ...prev]);
 
         if (result.success) {
-            toast({ title: "Notification Sent", description: result.message || "Successfully sent."});
+            toast({ title: "Notification Sent", description: result.message || `Successfully sent to ${recipientDescription}.`});
             setSubject('');
             setBody('');
             setSpecificRecipient('');
+            // setRecipientType('all'); // Optionally reset recipient type
         } else {
             toast({ title: "Failed to Send", description: result.message || "An error occurred.", variant: "destructive" });
         }
     } catch (error) {
-        toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
-         setSentNotifications(prev => [{ ...notificationData, id: String(Date.now()), sentAt: new Date(), status: 'Failed' }, ...prev]);
+        console.error("Error sending notification:", error);
+        toast({ title: "Error", description: "An unexpected error occurred while sending the notification.", variant: "destructive" });
+         setSentNotifications(prev => [{ 
+            recipient: recipientDescription, 
+            subject, 
+            body, 
+            id: String(Date.now()), 
+            sentAt: new Date(), 
+            status: 'Failed' 
+        }, ...prev]);
     } finally {
         setIsLoading(false);
     }
@@ -107,7 +139,7 @@ export default function NotificationsPage() {
           <CardContent className="space-y-4">
             <div>
               <Label htmlFor="recipientType">Recipient Type</Label>
-              <Select value={recipient} onValueChange={(value) => setRecipient(value as any)}>
+              <Select value={recipientType} onValueChange={(value) => setRecipientType(value as RecipientOption)}>
                 <SelectTrigger id="recipientType">
                   <SelectValue placeholder="Select recipient type" />
                 </SelectTrigger>
@@ -118,22 +150,48 @@ export default function NotificationsPage() {
                 </SelectContent>
               </Select>
             </div>
-            {recipient === 'specific' && (
+            {recipientType === 'specific' && (
               <div>
                 <Label htmlFor="specificEmail">Recipient Email</Label>
-                <Input id="specificEmail" type="email" placeholder="user@example.com" value={specificRecipient} onChange={e => setSpecificRecipient(e.target.value)} />
+                <Input 
+                    id="specificEmail" 
+                    type="email" 
+                    placeholder="user@example.com" 
+                    value={specificRecipient} 
+                    onChange={e => setSpecificRecipient(e.target.value)}
+                    disabled={isLoading}
+                />
               </div>
+            )}
+            {recipientType === 'group' && (
+                <p className="text-sm text-muted-foreground">
+                    Note: Selecting "User Group" is a placeholder. In a real system, you would define and select actual groups.
+                </p>
             )}
             <div>
               <Label htmlFor="subject">Subject</Label>
-              <Input id="subject" placeholder="Important Update" value={subject} onChange={e => setSubject(e.target.value)} />
+              <Input 
+                id="subject" 
+                placeholder="Important Update" 
+                value={subject} 
+                onChange={e => setSubject(e.target.value)}
+                disabled={isLoading}
+              />
             </div>
             <div>
               <Label htmlFor="body">Message Body</Label>
-              <Textarea id="body" placeholder="Enter your notification message here..." value={body} onChange={e => setBody(e.target.value)} rows={5} />
+              <Textarea 
+                id="body" 
+                placeholder="Enter your notification message here..." 
+                value={body} 
+                onChange={e => setBody(e.target.value)} 
+                rows={5} 
+                disabled={isLoading}
+              />
             </div>
             <Button onClick={handleSendNotification} disabled={isLoading}>
-              <Send className="mr-2 h-4 w-4" /> {isLoading ? "Sending..." : "Send Notification"}
+              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+              {isLoading ? "Sending..." : "Send Notification"}
             </Button>
           </CardContent>
         </Card>
@@ -141,19 +199,19 @@ export default function NotificationsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><History className="h-5 w-5" /> Sent Notifications History</CardTitle>
-            <CardDescription>Log of all notifications sent through the system.</CardDescription>
+            <CardDescription>Log of all notifications sent through the system (simulated).</CardDescription>
           </CardHeader>
           <CardContent>
             {sentNotifications.length === 0 ? (
               <p className="text-muted-foreground text-center">No notifications sent yet.</p>
             ) : (
-              <ul className="space-y-3">
+              <ul className="space-y-3 max-h-96 overflow-y-auto">
                 {sentNotifications.map(notif => (
                   <li key={notif.id} className="p-3 border rounded-md bg-background">
                     <p className="font-semibold text-sm">{notif.subject}</p>
                     <p className="text-xs text-muted-foreground">To: {notif.recipient} - <span className={notif.status === 'Sent' ? 'text-green-600' : 'text-red-600'}>{notif.status}</span></p>
                     <p className="text-xs text-muted-foreground">Sent: {notif.sentAt.toLocaleString()}</p>
-                    <p className="text-sm mt-1 truncate">{notif.body}</p>
+                    <p className="text-sm mt-1 whitespace-pre-wrap break-words">{notif.body}</p>
                   </li>
                 ))}
               </ul>
