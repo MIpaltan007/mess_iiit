@@ -1,7 +1,7 @@
 // src/services/userService.ts
 'use server';
 
-// import { getFirestore, collection, getDocs, query, orderBy, limit as firestoreLimit,getCountFromServer } from 'firebase/firestore';
+// import { getFirestore, collection, getDocs, query, orderBy, limit as firestrokeLimit, getCountFromServer } from 'firebase/firestore';
 // import { app } from './firebase'; // Assuming firebase is initialized in './firebase'
 
 export interface User {
@@ -10,16 +10,17 @@ export interface User {
   email: string;
   currentPlan?: string;
   joinDate: string;
-  role?: 'Student' | 'Admin' | 'Staff'; // Optional role, as it's in user-management but not on dashboard mock
+  role?: 'Student' | 'Admin' | 'Staff';
 }
 
-// Mock user data - in a real app, this would come from Firestore
+// Updated mock user data with roles
 const mockUsersData: User[] = [
-  { id: "U001", name: "Alice Smith", email: "alice@example.com", currentPlan: "Full Feast", joinDate: "2024-07-15" },
-  { id: "U002", name: "Bob Johnson", email: "bob@example.com", currentPlan: "Daily Delights", joinDate: "2024-07-01" },
-  { id: "U003", name: "Carol Williams", email: "carol@example.com", currentPlan: "Basic Bites", joinDate: "2024-06-20" },
-  { id: "U004", name: "David Brown", email: "david@example.com", currentPlan: "Full Feast", joinDate: "2024-05-10" },
-  { id: "U005", name: "Eve Davis", email: "eve@example.com", currentPlan: "Daily Delights", joinDate: "2024-04-02" },
+  { id: "U001", name: "Alice Smith", email: "alice.smith@example.com", currentPlan: "Full Feast", joinDate: "2024-07-15", role: "Student" },
+  { id: "U002", name: "Bob Johnson", email: "bob.johnson@example.com", currentPlan: "Daily Delights", joinDate: "2024-07-01", role: "Student" },
+  { id: "U003", name: "Charlie Admin", email: "charlie.admin@example.com", currentPlan: "Full Feast", joinDate: "2024-01-01", role: "Admin" },
+  { id: "U004", name: "Diana Staff", email: "diana.staff@example.com", joinDate: "2024-03-01", role: "Staff" }, // No current plan
+  { id: "U005", name: "Eve Davis", email: "eve.davis@example.com", currentPlan: "Basic Bites", joinDate: "2024-04-02", role: "Student" },
+  { id: "U006", name: "Frank Green", email: "frank.green@example.com", joinDate: "2024-07-20", role: "Student" },
 ];
 
 /**
@@ -53,7 +54,23 @@ export async function getRecentUsers(count: number): Promise<User[]> {
   // Simulate API delay
   await new Promise(resolve => setTimeout(resolve, 800));
   
-  // Sort mock users by joinDate (descending) and take the top 'count'
   const sortedUsers = [...mockUsersData].sort((a, b) => new Date(b.joinDate).getTime() - new Date(a.joinDate).getTime());
   return sortedUsers.slice(0, count);
+}
+
+/**
+ * Simulates fetching all users.
+ * In a real app, this would query Firestore.
+ */
+export async function getAllUsers(): Promise<User[]> {
+  // const db = getFirestore(app);
+  // const usersCollection = collection(db, 'users');
+  // const q = query(usersCollection, orderBy('name', 'asc')); // Example: order by name
+  // const querySnapshot = await getDocs(q);
+  // const users = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+  // return users;
+
+  // Simulate API delay
+  await new Promise(resolve => setTimeout(resolve, 700));
+  return [...mockUsersData]; // Return a copy of the mock data
 }
