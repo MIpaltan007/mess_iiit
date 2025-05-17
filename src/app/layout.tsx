@@ -9,7 +9,7 @@ const inter = Inter({ // Initialize Inter font
 });
 
 export const metadata: Metadata = {
-  title: 'Meal Plan Hub', // Updated app title
+  title: 'IIIT Mess', // Updated app title
   description: 'Manage your weekly meal plans with ease.', // Updated app description
 };
 
