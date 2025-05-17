@@ -10,6 +10,7 @@ import { ShoppingCart, CreditCard, CheckCircle, Trash2, ExternalLink } from 'luc
 import { processPayment, type PaymentInfo, type PaymentResult } from '@/services/payment';
 import { sendNotification, type Notification as NotificationType } from '@/services/notification';
 import { saveOrder, type OrderData } from '@/services/orderService';
+import { createCouponForOrder } from '@/services/couponService'; // Import createCouponForOrder
 import Link from 'next/link';
 import type { MenuItem } from './menu-display';
 
@@ -17,10 +18,11 @@ interface OrderSummaryProps {
   selectedMeals: MenuItem[];
   currentUserEmail: string | null;
   currentUserDisplayName: string | null;
+  currentUserUid: string | null; // Added currentUserUid
   onPaymentSuccess: () => void; // Callback to clear selections in parent
 }
 
-export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUserEmail, currentUserDisplayName, onPaymentSuccess }) => {
+export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUserEmail, currentUserDisplayName, currentUserUid, onPaymentSuccess }) => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [orderId, setOrderId] = useState<string | null>(null);
   const { toast } = useToast();
@@ -37,12 +39,11 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
   }, [orderId]);
 
   useEffect(() => {
-    // Only clear orderId if no meals are selected AND an order hasn't just been placed,
-    // OR if the user logs out.
-    if ((selectedMeals.length === 0 && !orderId) || !currentUserEmail) {
+    if (selectedMeals.length === 0 && !isLoading && !orderDetailsLink) { // Only clear orderId if not loading and link not already generated
       setOrderId(null);
     }
-  }, [selectedMeals, currentUserEmail, orderId]); // Added orderId to dependency array
+  }, [selectedMeals, isLoading, orderDetailsLink]);
+
 
   const handleProceedToPayment = async () => {
     if (selectedMeals.length === 0) {
@@ -54,7 +55,7 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
       return;
     }
 
-    if (!currentUserEmail) {
+    if (!currentUserEmail || !currentUserUid) { // Also check for currentUserUid
         toast({
             title: 'Not Logged In',
             description: 'Please log in to proceed with your order.',
@@ -65,12 +66,11 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
     }
 
     setIsLoading(true);
-    // setOrderId(null); // Don't clear orderId here, it might be from a previous successful order
     
     try {
       const paymentInfo: PaymentInfo = {
         amount: totalCost,
-        currency: 'INR', // Ensure currency is INR
+        currency: 'INR',
       };
       const paymentResult: PaymentResult = await processPayment(paymentInfo);
 
@@ -84,12 +84,25 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
         const newOrderId = await saveOrder(orderDataForDb);
         setOrderId(newOrderId); 
         
-        toast({
-          title: 'Payment Successful & Order Link Generated!',
-          description: `Your order link for order ${newOrderId} is ready. Transaction ID: ${paymentResult.transactionId}.`,
-          action: <CheckCircle className="text-green-500" />,
-        });
-
+        // Create a coupon for this order
+        try {
+          await createCouponForOrder(newOrderId, currentUserUid);
+          toast({
+            title: 'Payment Successful & Order Link Generated!',
+            description: `Order link for ${newOrderId} is ready. A new coupon has been created. Transaction ID: ${paymentResult.transactionId}.`,
+            action: <CheckCircle className="text-green-500" />,
+          });
+        } catch (couponError) {
+          console.error("Failed to create coupon for order:", newOrderId, couponError);
+          toast({ // Inform user about order success, but coupon creation issue
+            title: 'Payment Successful & Order Link Generated!',
+            description: `Order link for ${newOrderId} is ready. Transaction ID: ${paymentResult.transactionId}. (Note: Coupon creation failed, please contact support if needed)`,
+            variant: "default", // Keep it default as order was successful
+            duration: 7000,
+            action: <CheckCircle className="text-green-500" />,
+          });
+        }
+        
         const mealNames = selectedMeals.map(m => m.name).join(', ');
         const notification: NotificationType = {
           recipient: currentUserEmail,
@@ -98,7 +111,7 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
         };
         await sendNotification(notification);
         
-        onPaymentSuccess(); // Clear selected meals from parent
+        onPaymentSuccess(); 
 
       } else {
         toast({
@@ -148,7 +161,7 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
               <ExternalLink className="h-4 w-4"/> View Order Details: {orderId}
             </a>
 
-            <Button onClick={() => { setOrderId(null); /* onPaymentSuccess(); // No need to call this again, parent state already cleared */ }} variant="outline" size="sm" className="mt-4">
+            <Button onClick={() => { setOrderId(null); }} variant="outline" size="sm" className="mt-4">
               Place New Order
             </Button>
           </div>
@@ -185,8 +198,8 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
             </Button>
              <Button 
               onClick={() => {
-                onPaymentSuccess(); // Clears selectedMeals in parent
-                setOrderId(null);   // Explicitly clears orderId here if user clears before payment
+                onPaymentSuccess(); 
+                setOrderId(null);   
               }}
               variant="outline" 
               className="w-full"

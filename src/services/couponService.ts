@@ -1,7 +1,7 @@
 
 'use server';
 
-import { Timestamp, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { Timestamp, doc, getDoc, updateDoc, serverTimestamp, setDoc } from 'firebase/firestore'; // Added setDoc
 import { db } from './firebase';
 
 export interface CouponData {
@@ -40,7 +40,6 @@ export async function validateAndUseCoupon(couponCode: string): Promise<CouponVa
     return { couponId: couponCode, isValid: false, message: 'Coupon code cannot be empty.' };
   }
 
-  // Use couponCode directly for case-sensitive validation
   const couponRef = doc(db, 'coupons', couponCode); 
 
   try {
@@ -48,19 +47,18 @@ export async function validateAndUseCoupon(couponCode: string): Promise<CouponVa
 
     if (!docSnap.exists()) {
       return {
-        couponId: couponCode, // Use original couponCode as it was not found
+        couponId: couponCode, 
         isValid: false,
         message: 'Coupon code is invalid or does not exist.',
       };
     }
 
-    // docSnap.id is the coupon code as it exists in Firestore (case-sensitive)
     const couponData = { id: docSnap.id, ...docSnap.data() } as CouponData;
 
     if (!couponData.isValid) {
       const usedAtDate = couponData.usedAt ? couponData.usedAt.toDate().toLocaleString() : 'an unknown date';
       return {
-        couponId: couponData.id, // Use ID from DB (which is the case-sensitive coupon code)
+        couponId: couponData.id, 
         isValid: false,
         message: `Coupon has already been used on ${usedAtDate}.`,
         details: {
@@ -73,20 +71,18 @@ export async function validateAndUseCoupon(couponCode: string): Promise<CouponVa
       };
     }
 
-    // Mark coupon as used
     await updateDoc(couponRef, {
       isValid: false,
       usedAt: serverTimestamp(), 
     });
 
-    // Fetch the updated document to get the server-generated timestamp for `usedAt` for immediate display
     const updatedDocSnap = await getDoc(couponRef);
     const updatedCouponData = { id: updatedDocSnap.id, ...updatedDocSnap.data() } as CouponData;
     const finalUsedAt = updatedCouponData.usedAt ? updatedCouponData.usedAt.toDate().toLocaleString() : new Date().toLocaleString();
 
 
     return {
-      couponId: updatedCouponData.id, // Use ID from DB
+      couponId: updatedCouponData.id, 
       isValid: true,
       message: 'Coupon is valid and has been successfully redeemed.',
       details: {
@@ -99,15 +95,56 @@ export async function validateAndUseCoupon(couponCode: string): Promise<CouponVa
     };
   } catch (error: any) {
     console.error(
-      `Error validating coupon ${couponCode}:`, // Log original couponCode
+      `Error validating coupon ${couponCode}:`, 
       error.message,
       error.code ? `(Code: ${error.code})` : '',
       error.stack ? `\nStack: ${error.stack}` : ''
     );
     return {
-      couponId: couponCode, // Use original couponCode in case of error
+      couponId: couponCode, 
       isValid: false,
       message: 'An error occurred while validating the coupon. Please try again.',
     };
+  }
+}
+
+
+/**
+ * Creates a new coupon document in Firestore after a successful order.
+ * The document ID will be the orderId.
+ * @param orderId The ID of the order for which this coupon is being created.
+ * @param userId The Firebase UID of the user who placed the order.
+ * @returns Promise<void>
+ */
+export async function createCouponForOrder(orderId: string, userId: string): Promise<void> {
+  if (!orderId || !userId) {
+    console.error("Order ID and User ID are required to create a coupon.");
+    // Optionally throw an error or return a specific result
+    throw new Error("Missing orderId or userId for coupon creation.");
+  }
+
+  const couponRef = doc(db, 'coupons', orderId); // Use orderId as document ID
+  const newCouponData = {
+    userId: userId, // User's actual Firebase UID
+    isValid: true,
+    createdAt: serverTimestamp(),
+    // You can add more fields here if needed, e.g., a description
+    // description: `Coupon for order ${orderId}` 
+  };
+
+  try {
+    await setDoc(couponRef, newCouponData);
+    console.log(`Coupon created successfully for order ${orderId}, user ${userId}`);
+  } catch (error: any) {
+    console.error(
+      `Error creating coupon for order ${orderId}:`,
+      error.message,
+      error.code ? `(Code: ${error.code})` : '',
+      error.stack ? `\nStack: ${error.stack}` : ''
+    );
+    // Depending on requirements, you might want to re-throw the error
+    // or handle it (e.g., log to a monitoring service).
+    // For now, we just log it. The order process itself would have succeeded.
+    throw new Error(`Failed to create coupon for order ${orderId}.`);
   }
 }

@@ -57,6 +57,15 @@ export default function Home() {
   };
 
   const handleMealSelect = (meal: DisplayMenuItem, isSelected: boolean) => {
+    if (!currentUser && isSelected) {
+      toast({
+        title: 'Login Required',
+        description: 'Please log in or register to select meals.',
+        variant: 'destructive',
+        action: <Link href="/auth/login"><Button variant="outline" size="sm">Login</Button></Link>,
+      });
+      return; 
+    }
     setSelectedMeals(prevSelectedMeals => {
       if (isSelected) {
         return [...prevSelectedMeals, meal];
@@ -123,6 +132,7 @@ export default function Home() {
             selectedMeals={selectedMeals}
             currentUserEmail={currentUser?.email || null}
             currentUserDisplayName={currentUserProfile?.fullName || currentUser?.displayName || null}
+            currentUserUid={currentUser?.uid || null} // Pass UID here
             onPaymentSuccess={handleClearSelections}
           />
         </div>
