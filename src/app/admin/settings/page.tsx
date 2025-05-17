@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Settings, Save, Bell, Utensils, ArrowLeft, Palette, ShieldCheck } from "lucide-react";
+import { Settings, Save, Utensils, ArrowLeft, Palette, ShieldCheck } from "lucide-react"; // Removed Bell
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
@@ -17,9 +17,8 @@ export default function AdminSettingsPage() {
     const { toast } = useToast();
     const [siteName, setSiteName] = useState("IIIT Mess"); // Default changed
     const [defaultCurrency, setDefaultCurrency] = useState("INR"); // Default changed to INR
-    const [enableEmailNotifications, setEnableEmailNotifications] = useState(true);
+    // Removed enableEmailNotifications and adminNotificationEmail states
     const [maintenanceMode, setMaintenanceMode] = useState(false);
-    const [adminNotificationEmail, setAdminNotificationEmail] = useState("admin-alerts@example.com");
     const [primaryColor, setPrimaryColor] = useState("#4CAF50"); // Default from globals.css primary HSL
     const [sessionTimeout, setSessionTimeout] = useState(30);
 
@@ -34,15 +33,9 @@ export default function AdminSettingsPage() {
 
         const loadedCurrency = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}defaultCurrency`);
         if (loadedCurrency) setDefaultCurrency(loadedCurrency);
-
-        const loadedEmailNotifications = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}enableEmailNotifications`);
-        if (loadedEmailNotifications) setEnableEmailNotifications(loadedEmailNotifications === 'true');
         
         const loadedMaintenanceMode = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}maintenanceMode`);
         if (loadedMaintenanceMode) setMaintenanceMode(loadedMaintenanceMode === 'true');
-
-        const loadedAdminEmail = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}adminNotificationEmail`);
-        if (loadedAdminEmail) setAdminNotificationEmail(loadedAdminEmail);
 
         const loadedPrimaryColor = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}primaryColor`);
         if (loadedPrimaryColor) {
@@ -57,25 +50,18 @@ export default function AdminSettingsPage() {
 
     const handlePrimaryColorChange = (color: string) => {
         setPrimaryColor(color);
-        // Directly apply the color change to a new CSS variable to avoid HSL vs HEX conflict for --primary
-        // For this to work, components need to be aware of --primary-color-dynamic or --primary needs to be adaptable
-        // For simplicity in prototype, we'll just set it and assume it can be a HEX.
-        // In a real app, this needs careful theme management.
         document.documentElement.style.setProperty('--primary', color);
     }
 
     const handleSaveChanges = () => {
         localStorage.setItem(`${LOCAL_STORAGE_PREFIX}siteName`, siteName);
         localStorage.setItem(`${LOCAL_STORAGE_PREFIX}defaultCurrency`, defaultCurrency);
-        localStorage.setItem(`${LOCAL_STORAGE_PREFIX}enableEmailNotifications`, String(enableEmailNotifications));
+        // Removed saving for email notifications and admin email
         localStorage.setItem(`${LOCAL_STORAGE_PREFIX}maintenanceMode`, String(maintenanceMode));
-        localStorage.setItem(`${LOCAL_STORAGE_PREFIX}adminNotificationEmail`, adminNotificationEmail);
         localStorage.setItem(`${LOCAL_STORAGE_PREFIX}primaryColor`, primaryColor);
         localStorage.setItem(`${LOCAL_STORAGE_PREFIX}sessionTimeout`, String(sessionTimeout));
         
-        // Apply site name to document title
         document.title = siteName;
-        // Apply primary color (already applied on change, but ensure it's set on save too)
         document.documentElement.style.setProperty('--primary', primaryColor);
 
         toast({
@@ -140,28 +126,7 @@ export default function AdminSettingsPage() {
                 </CardContent>
             </Card>
 
-            {/* Notification Settings */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5"/> Notification Settings</CardTitle>
-                    <CardDescription>Manage how notifications are sent (simulated).</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between space-x-2">
-                        <Label htmlFor="email-notifications" className="flex flex-col space-y-1">
-                            <span>Email Notifications</span>
-                            <span className="font-normal leading-snug text-muted-foreground">
-                            Enable or disable email notifications for users.
-                            </span>
-                        </Label>
-                        <Switch id="email-notifications" checked={enableEmailNotifications} onCheckedChange={setEnableEmailNotifications} aria-label="Email notifications" />
-                    </div>
-                     <div>
-                        <Label htmlFor="adminEmail">Admin Notification Email</Label>
-                        <Input id="adminEmail" type="email" placeholder="admin-alerts@example.com" value={adminNotificationEmail} onChange={(e) => setAdminNotificationEmail(e.target.value)}/>
-                    </div>
-                </CardContent>
-            </Card>
+            {/* Notification Settings Card Removed */}
 
             {/* Appearance Settings */}
             <Card>
