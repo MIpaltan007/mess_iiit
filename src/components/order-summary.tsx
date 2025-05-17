@@ -6,7 +6,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { ShoppingCart, CreditCard, CheckCircle, Trash2, ExternalLink, Link as LinkIcon } from 'lucide-react';
+import { ShoppingCart, CreditCard, CheckCircle, Trash2, ExternalLink } from 'lucide-react';
 import { processPayment, type PaymentInfo, type PaymentResult } from '@/services/payment';
 import { sendNotification, type Notification as NotificationType } from '@/services/notification';
 import { saveOrder, type OrderData } from '@/services/orderService';
@@ -37,10 +37,12 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
   }, [orderId]);
 
   useEffect(() => {
-    if (selectedMeals.length === 0 || !currentUserEmail) {
+    // Only clear orderId if no meals are selected AND an order hasn't just been placed,
+    // OR if the user logs out.
+    if ((selectedMeals.length === 0 && !orderId) || !currentUserEmail) {
       setOrderId(null);
     }
-  }, [selectedMeals, currentUserEmail]);
+  }, [selectedMeals, currentUserEmail, orderId]); // Added orderId to dependency array
 
   const handleProceedToPayment = async () => {
     if (selectedMeals.length === 0) {
@@ -63,12 +65,12 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
     }
 
     setIsLoading(true);
-    setOrderId(null);
+    // setOrderId(null); // Don't clear orderId here, it might be from a previous successful order
     
     try {
       const paymentInfo: PaymentInfo = {
         amount: totalCost,
-        currency: 'INR',
+        currency: 'INR', // Ensure currency is INR
       };
       const paymentResult: PaymentResult = await processPayment(paymentInfo);
 
@@ -83,8 +85,8 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
         setOrderId(newOrderId); 
         
         toast({
-          title: 'Payment Successful & Order Placed!',
-          description: `Your order link for order ${newOrderId} is generated. Transaction ID: ${paymentResult.transactionId}.`,
+          title: 'Payment Successful & Order Link Generated!',
+          description: `Your order link for order ${newOrderId} is ready. Transaction ID: ${paymentResult.transactionId}.`,
           action: <CheckCircle className="text-green-500" />,
         });
 
@@ -96,7 +98,7 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
         };
         await sendNotification(notification);
         
-        onPaymentSuccess();
+        onPaymentSuccess(); // Clear selected meals from parent
 
       } else {
         toast({
@@ -146,7 +148,7 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
               <ExternalLink className="h-4 w-4"/> View Order Details: {orderId}
             </a>
 
-            <Button onClick={() => { setOrderId(null); }} variant="outline" size="sm" className="mt-4">
+            <Button onClick={() => { setOrderId(null); /* onPaymentSuccess(); // No need to call this again, parent state already cleared */ }} variant="outline" size="sm" className="mt-4">
               Place New Order
             </Button>
           </div>
@@ -167,7 +169,7 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
         )}
       </CardContent>
       
-      {!orderId && selectedMeals.length > 0 && ( 
+      {!orderDetailsLink && selectedMeals.length > 0 && ( 
         <CardFooter className="flex flex-col gap-4 pt-4 border-t">
             <div className="w-full flex justify-between items-center font-semibold text-lg">
               <span>Total Cost:</span>
@@ -183,8 +185,8 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
             </Button>
              <Button 
               onClick={() => {
-                onPaymentSuccess(); 
-                setOrderId(null);
+                onPaymentSuccess(); // Clears selectedMeals in parent
+                setOrderId(null);   // Explicitly clears orderId here if user clears before payment
               }}
               variant="outline" 
               className="w-full"
@@ -198,7 +200,7 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
         </CardFooter>
       )}
 
-       {!currentUserEmail && !orderId && selectedMeals.length > 0 && (
+       {!currentUserEmail && !orderDetailsLink && selectedMeals.length > 0 && (
          <CardFooter className="pt-4 border-t">
             <p className="text-sm text-center text-muted-foreground w-full">
                 Please <Link href="/auth/login" className="underline text-primary font-medium">log in</Link> to complete your purchase.
@@ -208,3 +210,4 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
     </Card>
   );
 };
+
