@@ -29,9 +29,14 @@ export async function saveOrder(orderData: Omit<OrderData, 'id' | 'createdAt'>):
     };
     const docRef = await addDoc(ordersCollection, orderToSave);
     return docRef.id;
-  } catch (error) {
-    console.error("Error saving order to Firestore:", error);
-    throw new Error("Could not save order.");
+  } catch (error: any) {
+    console.error(
+      "Error saving order to Firestore:", 
+      error.message, 
+      error.code ? `(Code: ${error.code})` : '', 
+      error.stack ? `\nStack: ${error.stack}` : ''
+    );
+    throw new Error("Could not save order. Check server logs for details.");
   }
 }
 
@@ -42,17 +47,27 @@ export async function saveOrder(orderData: Omit<OrderData, 'id' | 'createdAt'>):
  */
 export async function getOrderById(orderId: string): Promise<OrderData | null> {
   try {
+    if (!orderId || typeof orderId !== 'string' || orderId.trim() === '') {
+        console.warn(`Attempted to fetch order with invalid ID: "${orderId}"`);
+        return null;
+    }
     const docRef = doc(db, 'orders', orderId);
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
       return { id: docSnap.id, ...docSnap.data() } as OrderData;
     } else {
-      console.log("No such order found!");
+      console.log(`No order found with ID: ${orderId}`);
       return null;
     }
-  } catch (error) {
-    console.error("Error fetching order from Firestore:", error);
-    throw new Error("Could not fetch order details.");
+  } catch (error: any) {
+    console.error(
+        `Error fetching order ${orderId} from Firestore:`, 
+        error.message, 
+        error.code ? `(Code: ${error.code})` : '', 
+        error.stack ? `\nStack: ${error.stack}` : ''
+    );
+    throw new Error(`Could not fetch order details for ID: ${orderId}. Check server logs for details.`);
   }
 }
+
