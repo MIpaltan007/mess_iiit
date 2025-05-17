@@ -104,7 +104,7 @@ export default function AdminSettingsPage() {
 
         toast({
             title: "Settings Saved",
-            description: "Your changes have been saved to local storage and applied for this session.",
+            description: "Your changes have been saved",
         });
     };
 
