@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,21 +9,78 @@ import { Switch } from "@/components/ui/switch";
 import { Settings, Save, Bell, Utensils, ArrowLeft, Palette, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+const LOCAL_STORAGE_PREFIX = "adminSettings_";
 
 export default function AdminSettingsPage() {
     const { toast } = useToast();
-    const [siteName, setSiteName] = useState("Meal Plan Hub");
-    const [defaultCurrency, setDefaultCurrency] = useState("USD");
+    const [siteName, setSiteName] = useState("IIIT Mess"); // Default changed
+    const [defaultCurrency, setDefaultCurrency] = useState("INR"); // Default changed to INR
     const [enableEmailNotifications, setEnableEmailNotifications] = useState(true);
     const [maintenanceMode, setMaintenanceMode] = useState(false);
+    const [adminNotificationEmail, setAdminNotificationEmail] = useState("admin-alerts@example.com");
+    const [primaryColor, setPrimaryColor] = useState("#4CAF50"); // Default from globals.css primary HSL
+    const [sessionTimeout, setSessionTimeout] = useState(30);
+
+
+    // Load settings from localStorage on component mount
+    useEffect(() => {
+        const loadedSiteName = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}siteName`);
+        if (loadedSiteName) {
+            setSiteName(loadedSiteName);
+            document.title = loadedSiteName;
+        }
+
+        const loadedCurrency = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}defaultCurrency`);
+        if (loadedCurrency) setDefaultCurrency(loadedCurrency);
+
+        const loadedEmailNotifications = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}enableEmailNotifications`);
+        if (loadedEmailNotifications) setEnableEmailNotifications(loadedEmailNotifications === 'true');
+        
+        const loadedMaintenanceMode = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}maintenanceMode`);
+        if (loadedMaintenanceMode) setMaintenanceMode(loadedMaintenanceMode === 'true');
+
+        const loadedAdminEmail = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}adminNotificationEmail`);
+        if (loadedAdminEmail) setAdminNotificationEmail(loadedAdminEmail);
+
+        const loadedPrimaryColor = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}primaryColor`);
+        if (loadedPrimaryColor) {
+            setPrimaryColor(loadedPrimaryColor);
+            document.documentElement.style.setProperty('--primary-color-dynamic', loadedPrimaryColor);
+        }
+        
+        const loadedSessionTimeout = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}sessionTimeout`);
+        if (loadedSessionTimeout) setSessionTimeout(parseInt(loadedSessionTimeout, 10));
+
+    }, []);
+
+    const handlePrimaryColorChange = (color: string) => {
+        setPrimaryColor(color);
+        // Directly apply the color change to a new CSS variable to avoid HSL vs HEX conflict for --primary
+        // For this to work, components need to be aware of --primary-color-dynamic or --primary needs to be adaptable
+        // For simplicity in prototype, we'll just set it and assume it can be a HEX.
+        // In a real app, this needs careful theme management.
+        document.documentElement.style.setProperty('--primary', color);
+    }
 
     const handleSaveChanges = () => {
-        // In a real app, these settings would be saved to a backend/database
-        console.log({ siteName, defaultCurrency, enableEmailNotifications, maintenanceMode });
+        localStorage.setItem(`${LOCAL_STORAGE_PREFIX}siteName`, siteName);
+        localStorage.setItem(`${LOCAL_STORAGE_PREFIX}defaultCurrency`, defaultCurrency);
+        localStorage.setItem(`${LOCAL_STORAGE_PREFIX}enableEmailNotifications`, String(enableEmailNotifications));
+        localStorage.setItem(`${LOCAL_STORAGE_PREFIX}maintenanceMode`, String(maintenanceMode));
+        localStorage.setItem(`${LOCAL_STORAGE_PREFIX}adminNotificationEmail`, adminNotificationEmail);
+        localStorage.setItem(`${LOCAL_STORAGE_PREFIX}primaryColor`, primaryColor);
+        localStorage.setItem(`${LOCAL_STORAGE_PREFIX}sessionTimeout`, String(sessionTimeout));
+        
+        // Apply site name to document title
+        document.title = siteName;
+        // Apply primary color (already applied on change, but ensure it's set on save too)
+        document.documentElement.style.setProperty('--primary', primaryColor);
+
         toast({
             title: "Settings Saved",
-            description: "Your changes have been successfully saved.",
+            description: "Your changes have been saved to local storage and applied for this session.",
         });
     };
 
@@ -44,14 +102,13 @@ export default function AdminSettingsPage() {
               <Settings className="h-5 w-5" /> Settings
             </a>
           </Link>
-          {/* Add other admin links here */}
         </nav>
       </aside>
 
       <main className="flex-1 p-8 space-y-8">
         <header>
           <h2 className="text-3xl font-semibold text-primary">System Settings</h2>
-          <p className="text-muted-foreground">Configure general settings for the Meal Plan Hub.</p>
+          <p className="text-muted-foreground">Configure general settings for the IIIT Mess.</p>
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -64,17 +121,18 @@ export default function AdminSettingsPage() {
                 <CardContent className="space-y-4">
                     <div>
                         <Label htmlFor="siteName">Site Name</Label>
-                        <Input id="siteName" value={siteName} onChange={(e) => setSiteName(e.target.value)} placeholder="e.g., My Awesome Mess" />
+                        <Input id="siteName" value={siteName} onChange={(e) => setSiteName(e.target.value)} placeholder="e.g., IIIT Mess" />
                     </div>
                     <div>
                         <Label htmlFor="defaultCurrency">Default Currency</Label>
-                        <Input id="defaultCurrency" value={defaultCurrency} onChange={(e) => setDefaultCurrency(e.target.value)} placeholder="e.g., USD, INR" />
+                        <Input id="defaultCurrency" value={defaultCurrency} onChange={(e) => setDefaultCurrency(e.target.value)} placeholder="e.g., INR, USD" />
+                         <p className="text-xs text-muted-foreground mt-1">Note: Changing currency here is for display preference. Actual currency processing is handled elsewhere.</p>
                     </div>
                      <div className="flex items-center justify-between space-x-2 pt-2">
                         <Label htmlFor="maintenance-mode" className="flex flex-col space-y-1">
                             <span>Maintenance Mode</span>
                             <span className="font-normal leading-snug text-muted-foreground">
-                            Temporarily disable access for users.
+                            Temporarily disable access for users (simulated).
                             </span>
                         </Label>
                         <Switch id="maintenance-mode" checked={maintenanceMode} onCheckedChange={setMaintenanceMode} aria-label="Maintenance mode" />
@@ -86,7 +144,7 @@ export default function AdminSettingsPage() {
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5"/> Notification Settings</CardTitle>
-                    <CardDescription>Manage how notifications are sent.</CardDescription>
+                    <CardDescription>Manage how notifications are sent (simulated).</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="flex items-center justify-between space-x-2">
@@ -100,7 +158,7 @@ export default function AdminSettingsPage() {
                     </div>
                      <div>
                         <Label htmlFor="adminEmail">Admin Notification Email</Label>
-                        <Input id="adminEmail" type="email" placeholder="admin-alerts@example.com" />
+                        <Input id="adminEmail" type="email" placeholder="admin-alerts@example.com" value={adminNotificationEmail} onChange={(e) => setAdminNotificationEmail(e.target.value)}/>
                     </div>
                 </CardContent>
             </Card>
@@ -109,17 +167,18 @@ export default function AdminSettingsPage() {
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2"><Palette className="h-5 w-5"/> Appearance</CardTitle>
-                    <CardDescription>Customize the look and feel (placeholders).</CardDescription>
+                    <CardDescription>Customize the look and feel.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div>
                         <Label htmlFor="logoUpload">Upload Logo</Label>
-                        <Input id="logoUpload" type="file" />
-                         <p className="text-xs text-muted-foreground mt-1">Recommended size: 200x50px.</p>
+                        <Input id="logoUpload" type="file" disabled />
+                         <p className="text-xs text-muted-foreground mt-1">Recommended size: 200x50px (Upload disabled in prototype).</p>
                     </div>
                     <div>
                         <Label htmlFor="primaryColor">Primary Color</Label>
-                        <Input id="primaryColor" type="color" defaultValue="#4CAF50" className="h-10" />
+                        <Input id="primaryColor" type="color" value={primaryColor} onChange={(e) => handlePrimaryColorChange(e.target.value)} className="h-10" />
+                         <p className="text-xs text-muted-foreground mt-1">Changes apply to the current session. Actual theme change requires editing globals.css.</p>
                     </div>
                 </CardContent>
             </Card>
@@ -142,7 +201,7 @@ export default function AdminSettingsPage() {
                     </div>
                      <div>
                         <Label htmlFor="sessionTimeout">Session Timeout (minutes)</Label>
-                        <Input id="sessionTimeout" type="number" defaultValue="30" />
+                        <Input id="sessionTimeout" type="number" value={sessionTimeout} onChange={(e) => setSessionTimeout(parseInt(e.target.value,10) || 0)} />
                     </div>
                 </CardContent>
             </Card>
@@ -157,3 +216,4 @@ export default function AdminSettingsPage() {
     </div>
   );
 }
+
