@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BarChart, Users, ShoppingBag, Utensils, Bell, LogOut, Settings, FileText, QrCode, AlertCircle, DollarSign, Package, Activity } from "lucide-react";
+import { BarChart, Users, ShoppingBag, Utensils, LogOut, Settings, FileText, QrCode, AlertCircle, DollarSign, Package, Activity } from "lucide-react";
 import {
   ChartContainer,
   ChartTooltip,
@@ -112,11 +112,6 @@ export default function AdminDashboardPage() {
            <Link href="/admin/coupon-validation" legacyBehavior>
             <a className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium hover:bg-accent hover:text-accent-foreground">
               <QrCode className="h-5 w-5" /> Coupon Validation
-            </a>
-          </Link>
-          <Link href="/admin/notifications" legacyBehavior>
-            <a className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium hover:bg-accent hover:text-accent-foreground">
-              <Bell className="h-5 w-5" /> Notifications
             </a>
           </Link>
           <Link href="/admin/settings" legacyBehavior>

@@ -334,3 +334,4 @@ export default function MenuManagementPage() {
     </div>
   );
 }
+
