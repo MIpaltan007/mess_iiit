@@ -65,6 +65,7 @@ export default function ForgotPasswordPage() {
     const auth = getAuth(app);
     try {
       const methods = await fetchSignInMethodsForEmail(auth, values.email);
+      console.log('SignIn methods for email:', values.email, methods); // Diagnostic log
       if (methods.length > 0) {
         setValidatedEmail(values.email);
         setStage('resetPassword');
@@ -73,21 +74,27 @@ export default function ForgotPasswordPage() {
         toast({ title: 'Email Not Found', description: 'Email-ID not registered in our database.', variant: 'destructive' });
       }
     } catch (error: any) {
-      console.error("Error checking email:", error);
-      toast({ title: 'Error', description: 'An unexpected error occurred while checking your email.', variant: 'destructive' });
+      console.error("Error checking email - Code:", error.code, "Message:", error.message, "Full Error:", error); // Enhanced error logging
+      if (error.code === 'auth/invalid-api-key') {
+        toast({ title: 'Configuration Error', description: 'There is a problem with the application configuration. Please contact support.', variant: 'destructive' });
+      } else if (error.code === 'auth/network-request-failed') {
+        toast({ title: 'Network Error', description: 'Could not connect to authentication service. Please check your internet connection.', variant: 'destructive' });
+      }
+      else {
+        toast({ title: 'Error', description: 'An unexpected error occurred while checking your email.', variant: 'destructive' });
+      }
     } finally {
       setIsCheckingEmail(false);
     }
   }
 
   async function handlePasswordReset(values: PasswordResetFormValues) {
-    if (!validatedEmail) return; // Should not happen if stage is correct
+    if (!validatedEmail) return; 
 
     setIsResettingPassword(true);
     // ** IMPORTANT SIMULATION NOTE **
     // Directly updating a user's password without current authentication or a reset token
     // is not possible with client-side Firebase SDKs for security reasons.
-    // A real implementation of this specific flow would require a backend (e.g., Firebase Cloud Function with Admin SDK).
     // This section simulates a successful password update.
     console.log(`SIMULATING password update for ${validatedEmail} with new password: ${values.newPassword}`);
     
@@ -190,3 +197,5 @@ export default function ForgotPasswordPage() {
     </div>
   );
 }
+
+    
