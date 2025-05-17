@@ -65,7 +65,7 @@ export default function Home() {
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
             <UtensilsCrossed className="h-8 w-8" />
-            <h1 className="text-2xl font-bold">Meal Plan Hub</h1>
+            <h1 className="text-2xl font-bold">IIIT Mess</h1>
           </div>
           <nav className="flex items-center gap-4">
             {isLoadingAuth ? (
@@ -115,7 +115,7 @@ export default function Home() {
       </main>
 
       <footer className="bg-secondary text-secondary-foreground py-4 text-center">
-        <p>&copy; {new Date().getFullYear()} Meal Plan Hub. All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} IIIT Mess. All rights reserved.</p>
       </footer>
     </div>
   );
