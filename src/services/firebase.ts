@@ -1,6 +1,8 @@
 
 // src/services/firebase.ts
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
+
 // Optional: Import getAnalytics if you plan to use it
 // import { getAnalytics, isSupported } from "firebase/analytics";
 
@@ -21,6 +23,9 @@ if (!getApps().length) {
   app = getApp();
 }
 
+// Initialize Firestore
+const db = getFirestore(app);
+
 // Optional: Initialize Analytics
 // let analytics;
 // if (typeof window !== 'undefined') {
@@ -31,4 +36,4 @@ if (!getApps().length) {
 //   });
 // }
 
-export { app }; // export { app, analytics }; if using analytics
+export { app, db }; // export { app, db, analytics }; if using analytics

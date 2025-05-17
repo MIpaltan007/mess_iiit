@@ -1,9 +1,9 @@
 
 'use server';
 
-import { Timestamp, addDoc, collection, doc, getDoc, getFirestore } from 'firebase/firestore';
+import { Timestamp, addDoc, collection, doc, getDoc } from 'firebase/firestore';
 import type { MenuItem } from '@/components/menu-display';
-import { app } from './firebase';
+import { db } from './firebase'; // Changed import from 'app' to 'db'
 
 export interface OrderData {
   id?: string; // Firestore document ID, added after fetching
@@ -13,7 +13,7 @@ export interface OrderData {
   createdAt: Timestamp;
 }
 
-const db = getFirestore(app);
+// const db = getFirestore(app); // Removed: db is now imported directly
 const ordersCollection = collection(db, 'orders');
 
 /**
@@ -70,4 +70,3 @@ export async function getOrderById(orderId: string): Promise<OrderData | null> {
     throw new Error(`Could not fetch order details for ID: ${orderId}. Check server logs for details.`);
   }
 }
-
