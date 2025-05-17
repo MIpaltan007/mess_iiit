@@ -1,10 +1,13 @@
+
 'use client';
 
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BarChart, Users, ShoppingBag, Utensils, Bell, LogOut, Settings, FileText, QrCode } from "lucide-react";
-import Link from "next/link";
+import { Skeleton } from "@/components/ui/skeleton";
+import { BarChart, Users, ShoppingBag, Utensils, Bell, LogOut, Settings, FileText, QrCode, AlertCircle } from "lucide-react";
 import {
   ChartContainer,
   ChartTooltip,
@@ -13,6 +16,8 @@ import {
   ChartLegendContent
 } from "@/components/ui/chart";
 import { Bar, CartesianGrid, XAxis, YAxis, BarChart as RechartsBarChart, ResponsiveContainer, Tooltip as RechartsTooltip } from "recharts";
+import { getTotalUsersCount, getRecentUsers, type User as UserData } from "@/services/userService";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 
 const chartData = [
@@ -35,12 +40,6 @@ const chartConfig = {
   },
 };
 
-const mockUsers = [
-  { id: "U001", name: "Alice Smith", email: "alice@example.com", plan: "Full Feast", joinDate: "2024-01-15" },
-  { id: "U002", name: "Bob Johnson", email: "bob@example.com", plan: "Daily Delights", joinDate: "2024-02-01" },
-  { id: "U003", name: "Carol Williams", email: "carol@example.com", plan: "Basic Bites", joinDate: "2024-02-20" },
-];
-
 const mockRecentSales = [
     { id: "S001", user: "Alice Smith", plan: "Full Feast", amount: 90.00, date: "2024-07-20" },
     { id: "S002", user: "David Brown", plan: "Daily Delights", amount: 65.00, date: "2024-07-19" },
@@ -48,6 +47,30 @@ const mockRecentSales = [
 ];
 
 export default function AdminDashboardPage() {
+  const [totalUsers, setTotalUsers] = useState<number | null>(null);
+  const [recentUsers, setRecentUsers] = useState<UserData[]>([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
+  const [usersError, setUsersError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchUsersData() {
+      setIsLoadingUsers(true);
+      setUsersError(null);
+      try {
+        const count = await getTotalUsersCount();
+        setTotalUsers(count);
+        const users = await getRecentUsers(3); // Fetch 3 recent users for the dashboard
+        setRecentUsers(users);
+      } catch (error) {
+        console.error("Failed to fetch user data:", error);
+        setUsersError("Failed to load user data. Please try again later.");
+      } finally {
+        setIsLoadingUsers(false);
+      }
+    }
+    fetchUsersData();
+  }, []);
+
   return (
     <div className="flex min-h-screen bg-secondary">
       {/* Sidebar */}
@@ -117,8 +140,20 @@ export default function AdminDashboardPage() {
               <Users className="h-5 w-5 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">1,234</div>
-              <p className="text-xs text-muted-foreground">+20.1% from last month</p>
+              {isLoadingUsers ? (
+                <>
+                  <Skeleton className="h-8 w-1/2 mb-1" />
+                  <Skeleton className="h-4 w-3/4" />
+                </>
+              ) : usersError ? (
+                 <span className="text-sm text-destructive">{usersError.substring(0,25)}...</span>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">{totalUsers}</div>
+                  {/* Placeholder for percentage change */}
+                  <p className="text-xs text-muted-foreground">Currently active</p> 
+                </>
+              )}
             </CardContent>
           </Card>
           <Card>
@@ -152,6 +187,16 @@ export default function AdminDashboardPage() {
             </CardContent>
           </Card>
         </div>
+        
+        {usersError && (
+             <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Error Loading User Data</AlertTitle>
+                <AlertDescription>
+                    {usersError}
+                </AlertDescription>
+            </Alert>
+        )}
 
         {/* Sales Chart and Recent Users */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -187,24 +232,42 @@ export default function AdminDashboardPage() {
               <CardDescription>New users who joined recently.</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Plan</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {mockUsers.slice(0,3).map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>{user.name}</TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell><span className="px-2 py-1 text-xs font-medium rounded-full bg-accent text-accent-foreground">{user.plan}</span></TableCell>
+              {isLoadingUsers ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              ) : usersError && !recentUsers.length ? (
+                 <p className="text-sm text-muted-foreground text-center py-4">Could not load recent users.</p>
+              ) : recentUsers.length === 0 && !usersError ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No recent users found.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Plan</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {recentUsers.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell>{user.name}</TableCell>
+                        <TableCell>{user.email}</TableCell>
+                        <TableCell>
+                          {user.currentPlan ? (
+                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-accent text-accent-foreground">{user.currentPlan}</span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">N/A</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -243,3 +306,4 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
+
