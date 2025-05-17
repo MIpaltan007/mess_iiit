@@ -65,16 +65,21 @@ export default function ForgotPasswordPage() {
     const auth = getAuth(app);
     try {
       const methods = await fetchSignInMethodsForEmail(auth, values.email);
-      console.log('SignIn methods for email:', values.email, methods); // Diagnostic log
+      console.log('SignIn methods for email:', values.email, methods); 
       if (methods.length > 0) {
         setValidatedEmail(values.email);
         setStage('resetPassword');
         toast({ title: 'Email Verified', description: 'Please enter your new password.', icon: <CheckCircle className="h-5 w-5 text-green-500" /> });
       } else {
-        toast({ title: 'Email Not Found', description: 'Email-ID not registered in our database.', variant: 'destructive' });
+        toast({ 
+          title: 'Email Not Found', 
+          description: 'This email is not registered, or the application may not be correctly configured to access user data. Please verify the email or contact support if you are sure it is registered.', 
+          variant: 'destructive',
+          duration: 7000, // Longer duration for this more detailed message
+        });
       }
     } catch (error: any) {
-      console.error("Error checking email - Code:", error.code, "Message:", error.message, "Full Error:", error); // Enhanced error logging
+      console.error("Error checking email - Code:", error.code, "Message:", error.message, "Full Error Object:", error); 
       if (error.code === 'auth/invalid-api-key') {
         toast({ title: 'Configuration Error', description: 'There is a problem with the application configuration. Please contact support.', variant: 'destructive' });
       } else if (error.code === 'auth/network-request-failed') {
@@ -197,5 +202,3 @@ export default function ForgotPasswordPage() {
     </div>
   );
 }
-
-    
