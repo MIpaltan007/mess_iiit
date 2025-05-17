@@ -16,7 +16,7 @@ import {
   ChartLegendContent
 } from "@/components/ui/chart";
 import { Bar, CartesianGrid, XAxis, YAxis, BarChart as RechartsBarChart, ResponsiveContainer, Tooltip as RechartsTooltip } from "recharts";
-import { getTotalUsersCount, getRecentUsers, type User as UserData } from "@/services/userService";
+import { getTotalUsersCount, type User as UserData } from "@/services/userService"; // getRecentUsers removed
 import { getDashboardData, type DashboardStats, type SalesChartDataItem, type RecentSaleRecord } from "@/services/adminDashboardService";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -31,7 +31,7 @@ const initialChartConfig = {
 
 export default function AdminDashboardPage() {
   const [totalUsers, setTotalUsers] = useState<number | null>(null);
-  const [recentUsers, setRecentUsers] = useState<UserData[]>([]);
+  // recentUsers state and related logic removed
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [usersError, setUsersError] = useState<string | null>(null);
 
@@ -50,8 +50,7 @@ export default function AdminDashboardPage() {
       try {
         const count = await getTotalUsersCount();
         setTotalUsers(count);
-        const users = await getRecentUsers(3);
-        setRecentUsers(users);
+        // Call to getRecentUsers removed
       } catch (error) {
         console.error("Failed to fetch user data:", error);
         setUsersError("Failed to load user data.");
@@ -242,9 +241,9 @@ export default function AdminDashboardPage() {
             </Alert>
         )}
 
-        {/* Sales Chart and Recent Users */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <Card className="lg:col-span-1">
+        {/* Sales Chart */}
+        <div className="grid grid-cols-1 gap-8"> {/* Changed from lg:grid-cols-2 */}
+          <Card className="lg:col-span-2"> {/* Added lg:col-span-2 to make sales chart take full width */}
             <CardHeader>
               <CardTitle>Sales Trends</CardTitle>
               <CardDescription>Monthly sales overview.</CardDescription>
@@ -279,50 +278,7 @@ export default function AdminDashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="lg:col-span-1">
-            <CardHeader>
-              <CardTitle>Recent Users</CardTitle>
-              <CardDescription>New users who joined recently.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoadingUsers ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                </div>
-              ) : usersError && !recentUsers.length ? (
-                 <p className="text-sm text-muted-foreground text-center py-4">Could not load recent users.</p>
-              ) : recentUsers.length === 0 && !usersError ? (
-                <p className="text-sm text-muted-foreground text-center py-4">No recent users found.</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Plan</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {recentUsers.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell>{user.name}</TableCell>
-                        <TableCell>{user.email}</TableCell>
-                        <TableCell>
-                          {user.currentPlan ? (
-                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-accent text-accent-foreground">{user.currentPlan}</span>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">N/A</span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
+          {/* Recent Users Card Removed */}
         </div>
         
         {/* Recent Sales */}
@@ -371,3 +327,4 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
+
