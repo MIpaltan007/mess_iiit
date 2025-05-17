@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { MenuDisplay, type MenuItem as DisplayMenuItem } from '@/components/menu-display'; // Renamed MenuItem to avoid conflict
+import { MenuDisplay, type MenuItem as DisplayMenuItem } from '@/components/menu-display';
 import { OrderSummary } from '@/components/order-summary';
 import { User, Settings, UtensilsCrossed, LogOut, UserCircle } from 'lucide-react';
 import { getAuth, onAuthStateChanged, signOut, type User as FirebaseUser } from 'firebase/auth';
@@ -101,6 +101,7 @@ export default function Home() {
       <main className="flex-grow container mx-auto px-4 py-8 grid md:grid-cols-3 gap-8">
         <div className="md:col-span-2">
           <MenuDisplay 
+            currentUser={currentUser} // Pass currentUser here
             onMealSelect={handleMealSelect}
             selectedMeals={selectedMeals}
           />

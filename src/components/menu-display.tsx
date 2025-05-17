@@ -8,10 +8,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox'; // Added Checkbox
-import { Carrot, Leaf, Fish, WheatOff, PlusCircle, MinusCircle } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Carrot, Leaf, Fish, WheatOff } from 'lucide-react';
+import type { User as FirebaseUser } from 'firebase/auth';
+import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
 
-export interface MenuItem { // Exporting MenuItem
+export interface MenuItem {
   id: string;
   day: string;
   mealType: 'Breakfast' | 'Lunch' | 'Dinner';
@@ -24,7 +27,6 @@ export interface MenuItem { // Exporting MenuItem
 
 type DietaryTag = 'Vegetarian' | 'Vegan' | 'Gluten-Free' | 'Non-Veg';
 
-// Updated prices as per request
 const getPrice = (mealType: 'Breakfast' | 'Lunch' | 'Dinner'): number => {
   switch (mealType) {
     case 'Breakfast': return 25;
@@ -74,14 +76,16 @@ const dietaryTagIcons: Record<DietaryTag, React.ReactElement> = {
 const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 interface MenuDisplayProps {
+  currentUser: FirebaseUser | null;
   onMealSelect: (meal: MenuItem, isSelected: boolean) => void;
   selectedMeals: MenuItem[];
 }
 
-export const MenuDisplay: FC<MenuDisplayProps> = ({ onMealSelect, selectedMeals }) => {
+export const MenuDisplay: FC<MenuDisplayProps> = ({ currentUser, onMealSelect, selectedMeals }) => {
   const [menuData, setMenuData] = useState<MenuItem[]>([]);
   const [filter, setFilter] = useState<DietaryTag | 'All'>('All');
   const [selectedDay, setSelectedDay] = useState<string>('Monday');
+  const { toast } = useToast();
 
   useEffect(() => {
     setMenuData(menuDataWithPrices);
@@ -99,6 +103,19 @@ export const MenuDisplay: FC<MenuDisplayProps> = ({ onMealSelect, selectedMeals 
 
   const handleFilterChange = (value: string) => {
     setFilter(value as DietaryTag | 'All');
+  };
+
+  const handleMealCheckboxChange = (item: MenuItem, checked: boolean) => {
+    if (!currentUser && checked) {
+      toast({
+        title: 'Login Required',
+        description: 'Please log in or register to select meals.',
+        variant: 'destructive',
+        action: <Link href="/auth/login"><Button variant="outline" size="sm">Login</Button></Link>,
+      });
+      return; // Prevent selection
+    }
+    onMealSelect(item, checked);
   };
 
   return (
@@ -172,7 +189,7 @@ export const MenuDisplay: FC<MenuDisplayProps> = ({ onMealSelect, selectedMeals 
                       <Checkbox
                         id={`select-meal-${item.id}`}
                         checked={isSelected}
-                        onCheckedChange={(checked) => onMealSelect(item, !!checked)}
+                        onCheckedChange={(checkedState) => handleMealCheckboxChange(item, !!checkedState)}
                         aria-label={`Select ${item.name}`}
                       />
                     </TableCell>
