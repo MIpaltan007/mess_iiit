@@ -43,7 +43,7 @@ const initialChartConfig = {
   },
 };
 
-const ROLE_FILTER_OPTIONS: (UserRole | 'All')[] = ['All', 'Student', 'Staff', 'Admin'];
+const ROLE_FILTER_OPTIONS: (UserRole | 'All')[] = ['All', 'Student', 'Staff'];
 
 export default function SalesReportsPage() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
