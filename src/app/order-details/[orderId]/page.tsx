@@ -12,6 +12,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
+export const dynamic = 'force-dynamic'; // Ensure this route is always dynamically rendered
+
 export default function OrderDetailsPage() {
   const params = useParams();
   const orderId = params.orderId as string;
