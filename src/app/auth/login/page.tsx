@@ -54,15 +54,33 @@ export default function LoginPage() {
         router.push('/'); 
       }
     } catch (error: any) {
-      console.error('Login Failed:', error.message);
-      let errorMessage = 'Invalid credentials.';
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+      let errorMessage = 'An unexpected error occurred. Please try again.'; // Default user-facing message
+      let logMessage = `Login Failed: ${error.message || 'Unknown error'}`;
+      let logLevel: 'error' | 'warn' = 'error';
+
+      if (error.code === 'auth/user-not-found' || 
+          error.code === 'auth/wrong-password' || 
+          error.code === 'auth/invalid-credential') {
         errorMessage = 'Invalid email or password.';
+        logLevel = 'warn'; 
+        logMessage = `Login attempt failed due to invalid credentials (Code: ${error.code}). User notified: "${errorMessage}"`;
       } else if (error.code === 'auth/invalid-api-key') {
         errorMessage = 'Configuration error. Please contact support.';
+        logMessage = `Login Failed - Firebase API Key Invalid: (Code: ${error.code}) ${error.message}`;
       } else if (error.code === 'auth/network-request-failed') {
         errorMessage = 'Network error. Please check your connection.';
+        logMessage = `Login Failed - Network Error: (Code: ${error.code}) ${error.message}`;
+      } else {
+        // For other unexpected errors, use the default errorMessage and log full error.
+        logMessage = `Login Failed - Unexpected Error: (Code: ${error.code || 'N/A'}) ${error.message || 'Unknown error'}`;
       }
+
+      if (logLevel === 'error') {
+        console.error(logMessage, error); // Log the full error object for unexpected errors for more debug info.
+      } else {
+        console.warn(logMessage); // Log expected user errors as warnings.
+      }
+      
       toast({ title: 'Login Failed', description: errorMessage, variant: 'destructive' });
     }
   }
