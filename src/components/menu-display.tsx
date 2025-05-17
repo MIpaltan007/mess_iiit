@@ -13,6 +13,7 @@ import { Carrot, Leaf, Fish, WheatOff } from 'lucide-react';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import type { UserProfile, UserRole } from '@/services/userService'; // Import UserProfile and UserRole
 
 export interface MenuItem {
   id: string;
@@ -22,12 +23,21 @@ export interface MenuItem {
   description: string;
   dietaryTags: DietaryTag[];
   calories: number;
-  price: number;
+  price: number; // Price will now be dynamically set based on role
 }
 
 type DietaryTag = 'Vegetarian' | 'Vegan' | 'Gluten-Free' | 'Non-Veg';
 
-const getPrice = (mealType: 'Breakfast' | 'Lunch' | 'Dinner'): number => {
+const getPrice = (mealType: 'Breakfast' | 'Lunch' | 'Dinner', role: UserRole | null | undefined): number => {
+  if (role === 'Staff') {
+    switch (mealType) {
+      case 'Breakfast': return 20;
+      case 'Lunch': return 35;
+      case 'Dinner': return 30;
+      default: return 0;
+    }
+  }
+  // Default prices for Student, Admin, or if role is unknown
   switch (mealType) {
     case 'Breakfast': return 25;
     case 'Lunch': return 45;
@@ -36,7 +46,8 @@ const getPrice = (mealType: 'Breakfast' | 'Lunch' | 'Dinner'): number => {
   }
 };
 
-const initialMenuData: Omit<MenuItem, 'price'>[] = [
+// Base menu data without prices
+const initialMenuDataTemplate: Omit<MenuItem, 'price'>[] = [
   { id: '1', day: 'Monday', mealType: 'Breakfast', name: 'Scrambled Eggs & Toast', description: 'Classic scrambled eggs with whole wheat toast.', dietaryTags: ['Non-Veg'], calories: 350 },
   { id: '2', day: 'Monday', mealType: 'Lunch', name: 'Chicken Salad Sandwich', description: 'Grilled chicken salad on multigrain bread.', dietaryTags: ['Non-Veg'], calories: 550 },
   { id: '3', day: 'Monday', mealType: 'Dinner', name: 'Lentil Soup', description: 'Hearty lentil soup with vegetables.', dietaryTags: ['Vegan', 'Vegetarian', 'Gluten-Free'], calories: 400 },
@@ -60,12 +71,6 @@ const initialMenuData: Omit<MenuItem, 'price'>[] = [
   { id: '21', day: 'Sunday', mealType: 'Dinner', name: 'Shepherd\'s Pie', description: 'Ground lamb and vegetables topped with mashed potatoes.', dietaryTags: ['Non-Veg'], calories: 680 },
 ];
 
-const menuDataWithPrices: MenuItem[] = initialMenuData.map(item => ({
-  ...item,
-  price: getPrice(item.mealType),
-}));
-
-
 const dietaryTagIcons: Record<DietaryTag, React.ReactElement> = {
   'Vegetarian': <Leaf className="h-4 w-4 text-green-500" />,
   'Vegan': <Carrot className="h-4 w-4 text-orange-500" />,
@@ -77,25 +82,30 @@ const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Sat
 
 interface MenuDisplayProps {
   currentUser: FirebaseUser | null;
+  currentUserProfile: UserProfile | null; // Added to get role
   onMealSelect: (meal: MenuItem, isSelected: boolean) => void;
   selectedMeals: MenuItem[];
 }
 
-export const MenuDisplay: FC<MenuDisplayProps> = ({ currentUser, onMealSelect, selectedMeals }) => {
-  const [menuData, setMenuData] = useState<MenuItem[]>([]);
+export const MenuDisplay: FC<MenuDisplayProps> = ({ currentUser, currentUserProfile, onMealSelect, selectedMeals }) => {
   const [filter, setFilter] = useState<DietaryTag | 'All'>('All');
   const [selectedDay, setSelectedDay] = useState<string>('Monday');
   const { toast } = useToast();
 
-  useEffect(() => {
-    setMenuData(menuDataWithPrices);
-  }, []);
+  const menuDataWithDynamicPrices = useMemo(() => {
+    const role = currentUserProfile?.role || null; // Default to student prices if no role
+    return initialMenuDataTemplate.map(item => ({
+      ...item,
+      price: getPrice(item.mealType, role),
+    }));
+  }, [currentUserProfile]);
+
 
   const filteredMenu = useMemo(() => {
-    return menuData
+    return menuDataWithDynamicPrices
       .filter(item => item.day === selectedDay)
       .filter(item => filter === 'All' || item.dietaryTags.includes(filter));
-  }, [menuData, filter, selectedDay]);
+  }, [menuDataWithDynamicPrices, filter, selectedDay]);
 
   const handleDayChange = (day: string) => {
     setSelectedDay(day);
@@ -113,7 +123,7 @@ export const MenuDisplay: FC<MenuDisplayProps> = ({ currentUser, onMealSelect, s
         variant: 'destructive',
         action: <Link href="/auth/login"><Button variant="outline" size="sm">Login</Button></Link>,
       });
-      return; // Prevent selection
+      return; 
     }
     onMealSelect(item, checked);
   };
@@ -122,7 +132,7 @@ export const MenuDisplay: FC<MenuDisplayProps> = ({ currentUser, onMealSelect, s
     <Card className="shadow-lg rounded-lg">
       <CardHeader>
         <CardTitle className="text-2xl font-semibold text-primary">Weekly Menu</CardTitle>
-        <CardDescription>Explore our delicious and healthy meal options for the week. Select individual meals.</CardDescription>
+        <CardDescription>Explore our delicious and healthy meal options for the week. Select individual meals. Prices may vary based on your role.</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">

@@ -1,10 +1,24 @@
+
 // src/services/userService.ts
 'use server';
 
-import { collection, getDocs, query, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, Timestamp, doc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import type { OrderData } from './orderService';
 
+// Role definition
+export type UserRole = 'Student' | 'Admin' | 'Staff';
+
+// User profile structure (stored in 'users' collection)
+export interface UserProfile {
+  uid: string;
+  email: string;
+  fullName: string;
+  role: UserRole;
+  joinDate: string; // ISO string date
+}
+
+// User structure for admin listing (derived from orders)
 export interface User {
   id: string; // userEmail will serve as ID for this context
   name: string;
@@ -13,54 +27,85 @@ export interface User {
   joinDate: string; // ISO string date of the first order
 }
 
-// Mock data is no longer the primary source for getAllUsers
-const mockUsersData_legacy: Omit<User, 'totalMealCost'>[] = [
-  { id: "U001", name: "Alice Smith", email: "alice.smith@example.com", joinDate: "2024-07-15" },
-  { id: "U002", name: "Bob Johnson", email: "bob.johnson@example.com", joinDate: "2024-07-01" },
-];
+
+/**
+ * Saves or updates a user's profile in Firestore.
+ * @param profile - The user profile data.
+ */
+export async function saveUserProfile(profile: UserProfile): Promise<void> {
+  try {
+    const userDocRef = doc(db, 'users', profile.uid);
+    await setDoc(userDocRef, profile, { merge: true }); // Use merge to avoid overwriting if doc exists
+  } catch (error: any) {
+    console.error(
+      "Error saving user profile to Firestore:", 
+      error.message, 
+      error.code ? `(Code: ${error.code})` : '', 
+      error.stack ? `\nStack: ${error.stack}` : ''
+    );
+    throw new Error("Could not save user profile. Check server logs for details.");
+  }
+}
+
+/**
+ * Fetches a user's profile from Firestore.
+ * @param uid - The user's UID.
+ * @returns The user profile data if found, otherwise null.
+ */
+export async function getUserProfile(uid: string): Promise<UserProfile | null> {
+  try {
+    if (!uid) return null;
+    const userDocRef = doc(db, 'users', uid);
+    const docSnap = await getDoc(userDocRef);
+    if (docSnap.exists()) {
+      return docSnap.data() as UserProfile;
+    }
+    return null;
+  } catch (error: any) {
+    console.error(
+      `Error fetching user profile ${uid} from Firestore:`, 
+      error.message, 
+      error.code ? `(Code: ${error.code})` : '', 
+      error.stack ? `\nStack: ${error.stack}` : ''
+    );
+    // Don't throw, return null so app can proceed with default role/prices
+    return null; 
+  }
+}
 
 
 export async function getTotalUsersCount(): Promise<number> {
-  // This would ideally count distinct users from the 'users' collection or Firebase Auth.
-  // For now, we'll count distinct users based on orders as a proxy.
   const users = await getAllUsers();
   return users.length;
 }
 
-/**
- * Fetches all users based on their order history from Firestore.
- * Aggregates total meal costs and determines the first order date.
- */
 export async function getAllUsers(): Promise<User[]> {
   const ordersCollectionRef = collection(db, 'orders');
-  const q = query(ordersCollectionRef, orderBy('createdAt', 'asc')); // Order by creation to easily find first order
+  const q = query(ordersCollectionRef, orderBy('createdAt', 'asc')); 
 
   try {
     const querySnapshot = await getDocs(q);
     const usersMap = new Map<string, { name: string; email: string; totalMealCost: number; firstOrderDate: Date }>();
 
     querySnapshot.docs.forEach((doc) => {
-      const order = doc.data() as Omit<OrderData, 'id'>; // Cast to OrderData excluding id
-
-      if (!order.userEmail) return; // Skip if no email
+      const order = doc.data() as Omit<OrderData, 'id'>; 
+      if (!order.userEmail) return; 
 
       const existingUser = usersMap.get(order.userEmail);
       const orderDate = (order.createdAt as Timestamp).toDate();
 
       if (existingUser) {
         existingUser.totalMealCost += order.totalCost;
-        // Update name if current order has one and previous didn't, or if it's a more "complete" name (heuristic)
         if (order.userName && (!existingUser.name || order.userName.length > existingUser.name.length)) {
             existingUser.name = order.userName;
         }
-        // Keep the earliest order date
         if (orderDate < existingUser.firstOrderDate) {
           existingUser.firstOrderDate = orderDate;
         }
       } else {
         usersMap.set(order.userEmail, {
           email: order.userEmail,
-          name: order.userName || order.userEmail, // Fallback to email if name is not present
+          name: order.userName || order.userEmail, 
           totalMealCost: order.totalCost,
           firstOrderDate: orderDate,
         });
@@ -68,14 +113,13 @@ export async function getAllUsers(): Promise<User[]> {
     });
 
     const usersArray: User[] = Array.from(usersMap.entries()).map(([email, data]) => ({
-      id: email, // Use email as ID
+      id: email, 
       email: data.email,
       name: data.name,
       totalMealCost: data.totalMealCost,
-      joinDate: data.firstOrderDate.toISOString(), // Store as ISO string
+      joinDate: data.firstOrderDate.toISOString(), 
     }));
 
-    // Sort by name for consistent display
     return usersArray.sort((a, b) => a.name.localeCompare(b.name));
 
   } catch (error: any) {
@@ -85,18 +129,12 @@ export async function getAllUsers(): Promise<User[]> {
       error.code ? `(Code: ${error.code})` : '', 
       error.stack ? `\nStack: ${error.stack}` : ''
     );
-    // In case of error, return an empty array or re-throw, depending on desired error handling
     return []; 
   }
 }
 
-/**
- * Simulates fetching a list of recent users. (Not currently used by User Management page)
- * In a real app, this would query Firestore, ordering by joinDate.
- * @param count - The number of recent users to fetch.
- */
 export async function getRecentUsers(count: number): Promise<User[]> {
-  const allUsers = await getAllUsers(); // Leverages the new getAllUsers logic
+  const allUsers = await getAllUsers(); 
   const sortedUsers = [...allUsers].sort((a, b) => new Date(b.joinDate).getTime() - new Date(a.joinDate).getTime());
   return sortedUsers.slice(0, count);
 }

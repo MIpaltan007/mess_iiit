@@ -15,18 +15,23 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { UtensilsCrossed, UserPlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { app } from '@/services/firebase';
+import { saveUserProfile, UserRole } from '@/services/userService'; // Changed import
+
+const ROLES: UserRole[] = ['Student', 'Admin', 'Staff'];
 
 const registerFormSchema = z.object({
   fullName: z.string().min(2, { message: 'Full name must be at least 2 characters.' }),
   email: z.string().email({ message: 'Invalid email address.' }),
   password: z.string().min(6, { message: 'Password must be at least 6 characters.' }),
   confirmPassword: z.string(),
+  role: z.enum(ROLES, { required_error: 'Please select a role.' }),
 }).refine(data => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ['confirmPassword'], // path of error
@@ -45,6 +50,7 @@ export default function RegisterPage() {
       email: '',
       password: '',
       confirmPassword: '',
+      role: 'Student', // Default role
     },
   });
 
@@ -54,17 +60,26 @@ export default function RegisterPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
       
-      // Set user's display name
       if (user) {
+        // Set user's display name in Firebase Auth
         await updateProfile(user, {
           displayName: values.fullName,
+        });
+
+        // Save user profile (including role) to Firestore
+        await saveUserProfile({
+            uid: user.uid,
+            email: values.email,
+            fullName: values.fullName,
+            role: values.role,
+            joinDate: new Date().toISOString(), // Add joinDate for consistency if needed elsewhere
         });
       }
 
       toast({ title: 'Registration Successful!', description: 'Please log in with your new account.' });
       router.push('/auth/login');
     } catch (error: any) {
-      console.error('Registration Failed:', error.message);
+      console.error('Registration Failed:', error.message, error.code);
       let errorMessage = 'Could not create account.';
       if (error.code === 'auth/email-already-in-use') {
         errorMessage = 'This email address is already in use.';
@@ -140,6 +155,30 @@ export default function RegisterPage() {
                     <FormControl>
                       <Input type="password" placeholder="••••••••" {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="role"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Role</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select your role" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {ROLES.map(role => (
+                          <SelectItem key={role} value={role}>
+                            {role}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

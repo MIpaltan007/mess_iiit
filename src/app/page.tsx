@@ -11,10 +11,11 @@ import { getAuth, onAuthStateChanged, signOut, type User as FirebaseUser } from 
 import { app } from '@/services/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-
+import { getUserProfile, type UserProfile } from '@/services/userService'; // Import UserProfile
 
 export default function Home() {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+  const [currentUserProfile, setCurrentUserProfile] = useState<UserProfile | null>(null); // For role and other details
   const [selectedMeals, setSelectedMeals] = useState<DisplayMenuItem[]>([]);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const { toast } = useToast();
@@ -22,12 +23,21 @@ export default function Home() {
 
   useEffect(() => {
     const auth = getAuth(app);
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
-      setIsLoadingAuth(false);
-      if (!user) { // Clear selected meals if user logs out
+      if (user) {
+        try {
+          const profile = await getUserProfile(user.uid);
+          setCurrentUserProfile(profile);
+        } catch (error) {
+          console.error("Failed to fetch user profile:", error);
+          setCurrentUserProfile(null); // Reset profile on error
+        }
+      } else {
         setSelectedMeals([]);
+        setCurrentUserProfile(null); // Clear profile on logout
       }
+      setIsLoadingAuth(false);
     });
     return () => unsubscribe();
   }, []);
@@ -37,8 +47,9 @@ export default function Home() {
     try {
       await signOut(auth);
       toast({ title: 'Logged Out', description: 'You have been successfully logged out.' });
-      setSelectedMeals([]); // Clear meals on logout
-      router.push('/'); // Optional: redirect to home or login
+      setSelectedMeals([]); 
+      setCurrentUserProfile(null); // Clear profile on logout
+      router.push('/'); 
     } catch (error) {
       console.error('Logout failed:', error);
       toast({ title: 'Logout Failed', description: 'Could not log you out. Please try again.', variant: 'destructive' });
@@ -74,7 +85,7 @@ export default function Home() {
               <>
                 <span className="flex items-center gap-2">
                   <UserCircle className="h-6 w-6" />
-                  {currentUser.displayName || currentUser.email}
+                  {currentUserProfile?.fullName || currentUser.displayName || currentUser.email}
                 </span>
                 <Button variant="ghost" className="text-primary-foreground hover:bg-primary/80" onClick={handleLogout}>
                   <LogOut className="mr-2 h-5 w-5" /> Logout
@@ -101,7 +112,8 @@ export default function Home() {
       <main className="flex-grow container mx-auto px-4 py-8 grid md:grid-cols-3 gap-8">
         <div className="md:col-span-2">
           <MenuDisplay 
-            currentUser={currentUser} // Pass currentUser here
+            currentUser={currentUser} 
+            currentUserProfile={currentUserProfile} // Pass profile here
             onMealSelect={handleMealSelect}
             selectedMeals={selectedMeals}
           />
@@ -110,7 +122,7 @@ export default function Home() {
           <OrderSummary 
             selectedMeals={selectedMeals}
             currentUserEmail={currentUser?.email || null}
-            currentUserDisplayName={currentUser?.displayName || null}
+            currentUserDisplayName={currentUserProfile?.fullName || currentUser?.displayName || null}
             onPaymentSuccess={handleClearSelections}
           />
         </div>
