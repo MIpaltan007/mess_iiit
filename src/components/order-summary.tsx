@@ -1,107 +1,79 @@
+
 'use client';
 
 import type { FC } from 'react';
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { useState, useEffect, useMemo } from 'react'; // Added useMemo here
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { ShoppingCart, CreditCard, CheckCircle } from 'lucide-react'; // Example icons
+import { ShoppingCart, CreditCard, CheckCircle, Trash2 } from 'lucide-react';
 import { processPayment, type PaymentInfo, type PaymentResult } from '@/services/payment';
 import { sendNotification, type Notification, type NotificationResult } from '@/services/notification';
 import Link from 'next/link';
+import type { MenuItem } from './menu-display'; // Import MenuItem type
 
-
-interface MealPlan {
-  id: string;
-  name: string;
-  mealsPerWeek: number;
-  pricePerWeek: number;
-  description: string;
+interface OrderSummaryProps {
+  selectedMeals: MenuItem[];
+  currentUserEmail: string | null;
+  onPaymentSuccess: () => void; // Callback to clear selections in parent
 }
 
-// This should ideally be shared or fetched, duplicating for now.
-const availablePlans: MealPlan[] = [
-  { id: 'plan1', name: 'Basic Bites', mealsPerWeek: 5, pricePerWeek: 35.00, description: '5 meals of your choice per week.' },
-  { id: 'plan2', name: 'Daily Delights', mealsPerWeek: 10, pricePerWeek: 65.00, description: '10 meals, perfect for regular diners.' },
-  { id: 'plan3', name: 'Full Feast', mealsPerWeek: 15, pricePerWeek: 90.00, description: '15 meals, covering most of your weekly needs.' },
-];
-
-const LOCAL_STORAGE_KEY = 'selectedMealPlan';
-
-export const OrderSummary: FC = () => {
-  const [selectedPlan, setSelectedPlan] = useState<MealPlan | null>(null);
+export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUserEmail, onPaymentSuccess }) => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const { toast } = useToast();
 
-  const updateSummary = () => {
-    const storedPlanId = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (storedPlanId) {
-      const plan = availablePlans.find(p => p.id === storedPlanId);
-      setSelectedPlan(plan || null);
-    } else {
-      setSelectedPlan(null);
-    }
-  };
-
-  useEffect(() => {
-    updateSummary(); // Initial load
-
-    // Listen for custom event from MealPlanSelection
-    window.addEventListener('mealPlanChanged', updateSummary);
-    return () => {
-      window.removeEventListener('mealPlanChanged', updateSummary);
-    };
-  }, []);
+  const totalCost = useMemo(() => {
+    return selectedMeals.reduce((sum, meal) => sum + meal.price, 0);
+  }, [selectedMeals]);
 
   const handleProceedToPayment = async () => {
-    if (!selectedPlan) {
+    if (selectedMeals.length === 0) {
       toast({
-        title: 'Error',
-        description: 'No meal plan selected to proceed with payment.',
+        title: 'No Meals Selected',
+        description: 'Please select some meals before proceeding to payment.',
         variant: 'destructive',
       });
       return;
     }
 
+    if (!currentUserEmail) {
+        toast({
+            title: 'Not Logged In',
+            description: 'Please log in to proceed with your order.',
+            variant: 'destructive',
+            action: <Link href="/auth/login"><Button variant="outline" size="sm">Login</Button></Link>
+        });
+        return;
+    }
+
     setIsLoading(true);
     
-    // Simulate user being logged in
-    const MOCK_USER_EMAIL = "student@example.com"; 
-    const MOCK_USER_ID = "user123";
-
     try {
       const paymentInfo: PaymentInfo = {
-        amount: selectedPlan.pricePerWeek,
-        currency: 'USD',
+        amount: totalCost,
+        currency: 'INR', // Changed to INR
       };
       const paymentResult: PaymentResult = await processPayment(paymentInfo);
 
       if (paymentResult.success) {
         toast({
           title: 'Payment Successful!',
-          description: `Transaction ID: ${paymentResult.transactionId}. Your coupons are now active.`,
+          description: `Transaction ID: ${paymentResult.transactionId}. Your meal order is confirmed.`,
           action: <CheckCircle className="text-green-500" />,
         });
 
-        // Send notification
+        const mealNames = selectedMeals.map(m => m.name).join(', ');
         const notification: Notification = {
-          recipient: MOCK_USER_EMAIL, // Replace with actual user email
-          subject: 'Meal Plan Purchased Successfully',
-          body: `Dear Student, your purchase of the ${selectedPlan.name} for $${selectedPlan.pricePerWeek.toFixed(2)} was successful. Your coupons are ready to use!`,
+          recipient: currentUserEmail,
+          subject: 'Meal Order Confirmed',
+          body: `Dear Customer, your order for ${mealNames} for a total of ₹${totalCost.toFixed(2)} was successful. Enjoy your meals!`,
         };
         const notificationResult: NotificationResult = await sendNotification(notification);
         if (!notificationResult.success) {
           console.warn("Failed to send purchase notification:", notificationResult.message);
         }
-
-        // Here, you might want to update user's account in a real backend
-        // For example, store purchased coupons associated with the user ID.
-        console.log(`User ${MOCK_USER_ID} purchased ${selectedPlan.name}. Coupons: ${selectedPlan.mealsPerWeek}`);
-
-
-        // Clear selection from local storage after successful payment
-        localStorage.removeItem(LOCAL_STORAGE_KEY);
-        setSelectedPlan(null); // Update UI
+        
+        onPaymentSuccess(); // Clear selections in parent component
 
       } else {
         toast({
@@ -127,42 +99,62 @@ export const OrderSummary: FC = () => {
       <CardHeader>
         <CardTitle className="text-xl font-semibold text-primary flex items-center gap-2">
           <ShoppingCart className="h-6 w-6" />
-          Order Summary
+          Your Order
         </CardTitle>
-        <CardDescription>Review your selected meal plan before proceeding.</CardDescription>
+        <CardDescription>Review your selected meals.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {selectedPlan ? (
-          <>
-            <div>
-              <h4 className="font-medium">{selectedPlan.name}</h4>
-              <p className="text-sm text-muted-foreground">
-                {selectedPlan.mealsPerWeek} meals per week
-              </p>
-            </div>
-            <div className="flex justify-between items-center font-semibold text-lg">
+        {selectedMeals.length > 0 ? (
+          <ul className="space-y-2 max-h-60 overflow-y-auto pr-2">
+            {selectedMeals.map(meal => (
+              <li key={meal.id} className="flex justify-between items-center text-sm border-b pb-1">
+                <span>{meal.name} ({meal.mealType})</span>
+                <span className="font-medium">₹{meal.price.toFixed(2)}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="text-center text-muted-foreground py-4">
+            <p>Your cart is empty.</p>
+            <p className="text-xs mt-1">Select meals from the menu to add them here.</p>
+          </div>
+        )}
+      </CardContent>
+      {selectedMeals.length > 0 && (
+        <CardFooter className="flex flex-col gap-4 pt-4 border-t">
+            <div className="w-full flex justify-between items-center font-semibold text-lg">
               <span>Total Cost:</span>
-              <span>${selectedPlan.pricePerWeek.toFixed(2)}</span>
+              <span>₹{totalCost.toFixed(2)}</span>
             </div>
             <Button 
               onClick={handleProceedToPayment} 
               className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-              disabled={isLoading}
+              disabled={isLoading || selectedMeals.length === 0}
             >
               <CreditCard className="mr-2 h-5 w-5" />
-              {isLoading ? 'Processing...' : 'Proceed to Payment'}
+              {isLoading ? 'Processing...' : `Pay ₹${totalCost.toFixed(2)}`}
+            </Button>
+             <Button 
+              onClick={onPaymentSuccess} // Use onPaymentSuccess to clear from parent
+              variant="outline" 
+              className="w-full"
+              disabled={isLoading}
+            >
+              <Trash2 className="mr-2 h-4 w-4" /> Clear Selections
             </Button>
             <p className="text-xs text-muted-foreground text-center mt-2">
-              By clicking "Proceed to Payment", you agree to our terms and conditions.
+              By clicking "Pay", you agree to our terms and conditions.
             </p>
-          </>
-        ) : (
-          <div className="text-center text-muted-foreground py-4">
-            <p>Please select a meal plan to see your order summary.</p>
-            <p className="text-xs mt-1">You might need to <Link href="/auth/login" className="underline text-primary">log in</Link> to purchase.</p>
-          </div>
+        </CardFooter>
+      )}
+       {!currentUserEmail && selectedMeals.length > 0 && (
+         <CardFooter className="pt-4 border-t">
+            <p className="text-sm text-center text-muted-foreground w-full">
+                Please <Link href="/auth/login" className="underline text-primary font-medium">log in</Link> to complete your purchase.
+            </p>
+         </CardFooter>
         )}
-      </CardContent>
     </Card>
   );
 };
+

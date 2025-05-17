@@ -19,7 +19,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { UtensilsCrossed, UserPlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { app } from '@/services/firebase';
 
 const registerFormSchema = z.object({
@@ -51,10 +51,16 @@ export default function RegisterPage() {
   async function onSubmit(values: RegisterFormValues) {
     const auth = getAuth(app);
     try {
-      // const userCredential = 
-      await createUserWithEmailAndPassword(auth, values.email, values.password);
-      // const user = userCredential.user;
-      // You might want to store the fullName in Firestore or user profile here
+      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const user = userCredential.user;
+      
+      // Set user's display name
+      if (user) {
+        await updateProfile(user, {
+          displayName: values.fullName,
+        });
+      }
+
       toast({ title: 'Registration Successful!', description: 'Please log in with your new account.' });
       router.push('/auth/login');
     } catch (error: any) {

@@ -1,3 +1,4 @@
+
 /**
  * Represents payment information.
  */
@@ -9,7 +10,7 @@ export interface PaymentInfo {
   /**
    * The currency of the payment.
    */
-  currency: string;
+  currency: string; // e.g., "USD", "INR"
 }
 
 /**
@@ -37,11 +38,23 @@ export interface PaymentResult {
  * @returns A promise that resolves to a PaymentResult object indicating the success or failure of the payment.
  */
 export async function processPayment(paymentInfo: PaymentInfo): Promise<PaymentResult> {
-  // TODO: Implement this by calling a payment API.
+  // TODO: Implement this by calling a real payment API (e.g., Stripe, Razorpay).
+  console.log("Processing payment for:", paymentInfo.amount, paymentInfo.currency);
+  
+  // Simulate API call delay
+  await new Promise(resolve => setTimeout(resolve, 1500));
 
-  return {
-    success: true,
-    transactionId: '1234567890',
-    message: 'Payment successful',
-  };
+  // Simulate a successful payment
+  if (paymentInfo.amount >= 0) { // Basic validation
+    return {
+      success: true,
+      transactionId: `txn_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+      message: 'Payment successful',
+    };
+  } else {
+    return {
+      success: false,
+      message: 'Invalid payment amount.',
+    };
+  }
 }
