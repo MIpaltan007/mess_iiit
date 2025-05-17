@@ -19,6 +19,7 @@ import { Bar, CartesianGrid, XAxis, YAxis, BarChart as RechartsBarChart, Respons
 import { getTotalUsersCount, getRecentUsers, type User as UserData } from "@/services/userService";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
+export const dynamic = 'force-dynamic'; // Opt into dynamic rendering
 
 const chartData = [
   { month: "January", desktop: 186, mobile: 80 },
