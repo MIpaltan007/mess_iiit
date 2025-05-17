@@ -51,4 +51,3 @@ export async function sendNotification(notification: Notification): Promise<Noti
     message: 'Notification sent successfully (simulated)',
   };
 }
-

@@ -6,13 +6,12 @@ import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { ShoppingCart, CreditCard, CheckCircle, Trash2, QrCode, ExternalLink, Link as LinkIcon, AlertTriangle } from 'lucide-react';
+import { ShoppingCart, CreditCard, CheckCircle, Trash2, ExternalLink, Link as LinkIcon } from 'lucide-react';
 import { processPayment, type PaymentInfo, type PaymentResult } from '@/services/payment';
 import { sendNotification, type Notification as NotificationType } from '@/services/notification';
 import { saveOrder, type OrderData } from '@/services/orderService';
 import Link from 'next/link';
 import type { MenuItem } from './menu-display';
-import Image from 'next/image';
 
 interface OrderSummaryProps {
   selectedMeals: MenuItem[];
@@ -23,9 +22,7 @@ interface OrderSummaryProps {
 
 export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUserEmail, currentUserDisplayName, onPaymentSuccess }) => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
-  const [imageError, setImageError] = useState<boolean>(false);
   const { toast } = useToast();
 
   const totalCost = useMemo(() => {
@@ -41,15 +38,9 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
 
   useEffect(() => {
     if (selectedMeals.length === 0 || !currentUserEmail) {
-      setQrCodeUrl(null);
       setOrderId(null);
-      setImageError(false);
     }
   }, [selectedMeals, currentUserEmail]);
-
-  useEffect(() => {
-    setImageError(false);
-  }, [qrCodeUrl]);
 
   const handleProceedToPayment = async () => {
     if (selectedMeals.length === 0) {
@@ -72,9 +63,7 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
     }
 
     setIsLoading(true);
-    setQrCodeUrl(null);
     setOrderId(null);
-    setImageError(false);
     
     try {
       const paymentInfo: PaymentInfo = {
@@ -86,30 +75,24 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
       if (paymentResult.success) {
         const orderDataForDb: Omit<OrderData, 'id' | 'createdAt'> = {
           userEmail: currentUserEmail,
-          userName: currentUserDisplayName || undefined, // Save display name if available
+          userName: currentUserDisplayName || undefined,
           selectedMeals: selectedMeals,
           totalCost: totalCost,
         };
         const newOrderId = await saveOrder(orderDataForDb);
-        setOrderId(newOrderId); // This will trigger useMemo for orderDetailsLink
-
-        // Construct QR code URL after orderId is set and orderDetailsLink is available
-        // Need to ensure orderDetailsLink is constructed before qr is made
-        const localOrderDetailsLink = `${window.location.origin}/order-details/${newOrderId}`;
-        const generatedQrUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(localOrderDetailsLink)}&size=250x250&format=png`;
-        setQrCodeUrl(generatedQrUrl);
+        setOrderId(newOrderId); 
         
         toast({
           title: 'Payment Successful & Order Placed!',
-          description: `Your QR code for order ${newOrderId} is generated. Transaction ID: ${paymentResult.transactionId}.`,
+          description: `Your order link for order ${newOrderId} is generated. Transaction ID: ${paymentResult.transactionId}.`,
           action: <CheckCircle className="text-green-500" />,
         });
 
         const mealNames = selectedMeals.map(m => m.name).join(', ');
         const notification: NotificationType = {
           recipient: currentUserEmail,
-          subject: 'Meal Order Confirmed & QR Code Generated',
-          body: `Dear ${currentUserDisplayName || 'Customer'}, your order for ${mealNames} (Total: ₹${totalCost.toFixed(2)}) was successful. Scan your QR code or use the link to view details. Order ID: ${newOrderId}.`,
+          subject: 'Meal Order Confirmed & Details Link Generated',
+          body: `Dear ${currentUserDisplayName || 'Customer'}, your order for ${mealNames} (Total: ₹${totalCost.toFixed(2)}) was successful. Use the link provided to view your order details. Order ID: ${newOrderId}.`,
         };
         await sendNotification(notification);
         
@@ -148,60 +131,22 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
         <CardDescription>Review your selected meals.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {orderId ? ( // If orderId exists, payment was successful
+        {orderDetailsLink ? ( 
           <div className="text-center space-y-3 p-4 border border-green-500 rounded-md bg-green-50">
             <h3 className="text-lg font-semibold text-green-700">Order Confirmed!</h3>
             <p className="text-sm text-muted-foreground">Order ID: {orderId}</p>
             
-            {qrCodeUrl && !imageError && (
-              <div className="flex justify-center">
-                <Image 
-                  data-ai-hint="qr code"
-                  src={qrCodeUrl} 
-                  alt={`QR Code for order ${orderId}`} 
-                  width={200} 
-                  height={200} 
-                  className="rounded-md shadow-md"
-                  onError={() => {
-                    console.error("Failed to load QR code image from:", qrCodeUrl);
-                    setImageError(true);
-                  }}
-                />
-              </div>
-            )}
+            <p className="text-sm text-foreground">Access your order details using the link below:</p>
+            <a 
+              href={orderDetailsLink} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="inline-flex items-center justify-center gap-1.5 text-primary underline font-medium hover:text-primary/80 break-all"
+            >
+              <ExternalLink className="h-4 w-4"/> View Order Details: {orderId}
+            </a>
 
-            {imageError && orderDetailsLink && (
-              <div className="p-4 border border-destructive rounded-md bg-red-50 text-destructive text-sm space-y-2">
-                <div className='flex items-center justify-center gap-2'>
-                    <AlertTriangle className="h-5 w-5" />
-                    <p className="font-medium">QR Code Display Error</p>
-                </div>
-                <p>The QR code image could not be displayed. You can access your order details using the link below:</p>
-                <a 
-                  href={orderDetailsLink} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="inline-flex items-center justify-center gap-1.5 text-primary underline font-medium hover:text-primary/80 break-all"
-                >
-                  <LinkIcon className="h-4 w-4"/> View Order Details: {orderId}
-                </a>
-              </div>
-            )}
-             {!imageError && !qrCodeUrl && orderDetailsLink && ( // Case where QR might still be loading or was never set, but link is available
-                <div className="p-4 border border-accent rounded-md bg-yellow-50 text-accent-foreground text-sm space-y-2">
-                    <p className="font-medium">Access your order details using the link below:</p>
-                    <a 
-                        href={orderDetailsLink} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="inline-flex items-center justify-center gap-1.5 text-primary underline font-medium hover:text-primary/80 break-all"
-                    >
-                        <LinkIcon className="h-4 w-4"/> View Order Details: {orderId}
-                    </a>
-                </div>
-            )}
-
-            <Button onClick={() => { setQrCodeUrl(null); setOrderId(null); setImageError(false); }} variant="outline" size="sm" className="mt-2">
+            <Button onClick={() => { setOrderId(null); }} variant="outline" size="sm" className="mt-4">
               Place New Order
             </Button>
           </div>
@@ -222,7 +167,7 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
         )}
       </CardContent>
       
-      {!orderId && selectedMeals.length > 0 && ( // Show payment button only if order is not yet placed
+      {!orderId && selectedMeals.length > 0 && ( 
         <CardFooter className="flex flex-col gap-4 pt-4 border-t">
             <div className="w-full flex justify-between items-center font-semibold text-lg">
               <span>Total Cost:</span>
@@ -234,14 +179,12 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
               disabled={isLoading || selectedMeals.length === 0}
             >
               <CreditCard className="mr-2 h-5 w-5" />
-              {isLoading ? 'Processing...' : `Pay ₹${totalCost.toFixed(2)} & Get Details`}
+              {isLoading ? 'Processing...' : `Pay ₹${totalCost.toFixed(2)} & Get Details Link`}
             </Button>
              <Button 
               onClick={() => {
-                onPaymentSuccess(); // This clears selectedMeals in parent
-                setQrCodeUrl(null); 
+                onPaymentSuccess(); 
                 setOrderId(null);
-                setImageError(false);
               }}
               variant="outline" 
               className="w-full"
