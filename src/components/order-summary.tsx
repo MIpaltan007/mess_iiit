@@ -6,13 +6,13 @@ import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { ShoppingCart, CreditCard, CheckCircle, Trash2, QrCode } from 'lucide-react';
+import { ShoppingCart, CreditCard, CheckCircle, Trash2, QrCode, ExternalLink } from 'lucide-react';
 import { processPayment, type PaymentInfo, type PaymentResult } from '@/services/payment';
-import { sendNotification, type Notification as NotificationType } from '@/services/notification'; // Renamed Notification to NotificationType
+import { sendNotification, type Notification as NotificationType } from '@/services/notification';
 import { saveOrder, type OrderData } from '@/services/orderService';
 import Link from 'next/link';
 import type { MenuItem } from './menu-display';
-import Image from 'next/image'; // For displaying QR code
+import Image from 'next/image';
 
 interface OrderSummaryProps {
   selectedMeals: MenuItem[];
@@ -24,6 +24,7 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<boolean>(false); // State to track image loading errors
   const { toast } = useToast();
 
   const totalCost = useMemo(() => {
@@ -31,12 +32,18 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
   }, [selectedMeals]);
 
   useEffect(() => {
-    // Reset QR code if selected meals change or user logs out
+    // Reset QR code and image error if selected meals change or user logs out
     if (selectedMeals.length === 0 || !currentUserEmail) {
       setQrCodeUrl(null);
       setOrderId(null);
+      setImageError(false);
     }
   }, [selectedMeals, currentUserEmail]);
+
+  // Reset image error when a new QR code URL is generated
+  useEffect(() => {
+    setImageError(false);
+  }, [qrCodeUrl]);
 
   const handleProceedToPayment = async () => {
     if (selectedMeals.length === 0) {
@@ -61,6 +68,7 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
     setIsLoading(true);
     setQrCodeUrl(null);
     setOrderId(null);
+    setImageError(false);
     
     try {
       const paymentInfo: PaymentInfo = {
@@ -70,7 +78,6 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
       const paymentResult: PaymentResult = await processPayment(paymentInfo);
 
       if (paymentResult.success) {
-        // Save order to Firestore
         const orderDataForDb: Omit<OrderData, 'id' | 'createdAt'> = {
           userEmail: currentUserEmail,
           selectedMeals: selectedMeals,
@@ -79,11 +86,9 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
         const newOrderId = await saveOrder(orderDataForDb);
         setOrderId(newOrderId);
 
-        // Construct order details URL
         const orderDetailsPath = `/order-details/${newOrderId}`;
         const absoluteOrderDetailsURL = `${window.location.origin}${orderDetailsPath}`;
 
-        // Generate QR code URL
         const generatedQrUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(absoluteOrderDetailsURL)}&size=250x250&format=png`;
         setQrCodeUrl(generatedQrUrl);
         
@@ -94,14 +99,14 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
         });
 
         const mealNames = selectedMeals.map(m => m.name).join(', ');
-        const notification: NotificationType = { // Use aliased NotificationType
+        const notification: NotificationType = {
           recipient: currentUserEmail,
           subject: 'Meal Order Confirmed & QR Code Generated',
           body: `Dear Customer, your order for ${mealNames} (Total: ₹${totalCost.toFixed(2)}) was successful. Scan your QR code at the mess. Order ID: ${newOrderId}.`,
         };
-        await sendNotification(notification); // No need to check result for prototype
+        await sendNotification(notification);
         
-        onPaymentSuccess(); // Clear selections in parent component
+        onPaymentSuccess();
 
       } else {
         toast({
@@ -141,16 +146,37 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
             <h3 className="text-lg font-semibold text-green-700">Order Confirmed!</h3>
             <p className="text-sm text-muted-foreground">Scan this QR code at the mess for Order ID: {orderId}.</p>
             <div className="flex justify-center">
-              <Image 
-                data-ai-hint="qr code"
-                src={qrCodeUrl} 
-                alt={`QR Code for order ${orderId}`} 
-                width={200} 
-                height={200} 
-                className="rounded-md shadow-md"
-              />
+              {!imageError ? (
+                <Image 
+                  data-ai-hint="qr code"
+                  src={qrCodeUrl} 
+                  alt={`QR Code for order ${orderId}`} 
+                  width={200} 
+                  height={200} 
+                  className="rounded-md shadow-md"
+                  onError={() => {
+                    console.error("Failed to load QR code image from:", qrCodeUrl);
+                    setImageError(true);
+                  }}
+                />
+              ) : (
+                <div className="p-4 border border-destructive rounded-md bg-red-50 text-destructive text-sm">
+                  <p>Could not load QR code image.</p>
+                  <p className="mt-1">
+                    Try accessing it directly: 
+                    <a 
+                      href={qrCodeUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="underline ml-1 font-medium hover:text-destructive/80 flex items-center justify-center"
+                    >
+                      Open QR Link <ExternalLink className="h-4 w-4 ml-1"/>
+                    </a>
+                  </p>
+                </div>
+              )}
             </div>
-             <Button onClick={() => { setQrCodeUrl(null); setOrderId(null); }} variant="outline" size="sm" className="mt-2">
+             <Button onClick={() => { setQrCodeUrl(null); setOrderId(null); setImageError(false); }} variant="outline" size="sm" className="mt-2">
               Place New Order
             </Button>
           </div>
@@ -187,9 +213,10 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
             </Button>
              <Button 
               onClick={() => {
-                onPaymentSuccess(); // Clear selections in parent
-                setQrCodeUrl(null); // Also clear QR if any was somehow present
+                onPaymentSuccess(); 
+                setQrCodeUrl(null); 
                 setOrderId(null);
+                setImageError(false);
               }}
               variant="outline" 
               className="w-full"
@@ -213,3 +240,4 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
     </Card>
   );
 };
+
