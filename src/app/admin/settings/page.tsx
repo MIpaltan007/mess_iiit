@@ -191,7 +191,6 @@ export default function AdminSettingsPage() {
                     <div>
                         <Label htmlFor="primaryColor">Primary Color</Label>
                         <Input id="primaryColor" type="color" value={primaryColor} onChange={(e) => handlePrimaryColorChange(e.target.value)} className="h-10 w-full" />
-                         <p className="text-xs text-muted-foreground mt-1">Changes apply to the current session. Actual theme change requires editing globals.css for default.</p>
                     </div>
                 </CardContent>
             </Card>
