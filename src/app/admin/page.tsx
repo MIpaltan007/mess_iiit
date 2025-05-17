@@ -138,7 +138,7 @@ export default function AdminDashboardPage() {
       <main className="flex-1 p-8 space-y-8">
         <header className="flex justify-between items-center">
           <h2 className="text-3xl font-semibold text-primary">Dashboard Overview</h2>
-          <Button variant="outline">Generate Report</Button>
+          {/* Removed Generate Report Button */}
         </header>
 
         {/* Stats Cards */}
