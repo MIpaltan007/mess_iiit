@@ -1,7 +1,10 @@
+
 import type {Metadata} from 'next';
 import { Inter } from 'next/font/google'; // Changed font to Inter
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster'; // Added Toaster
+
+export const dynamic = 'force-dynamic'; // Opt into dynamic rendering for all pages
 
 const inter = Inter({ // Initialize Inter font
   subsets: ['latin'],
