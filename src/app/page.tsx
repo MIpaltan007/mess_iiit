@@ -6,12 +6,13 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { MenuDisplay, type MenuItem as DisplayMenuItem } from '@/components/menu-display';
 import { OrderSummary } from '@/components/order-summary';
-import { User, Settings, UtensilsCrossed, LogOut, UserCircle } from 'lucide-react';
+import { User, Settings, UtensilsCrossed, LogOut, UserCircle, Mail } from 'lucide-react'; // Added Mail
 import { getAuth, onAuthStateChanged, signOut, type User as FirebaseUser } from 'firebase/auth';
 import { app } from '@/services/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { getUserProfile, type UserProfile } from '@/services/userService'; 
+import { Card, CardContent } from '@/components/ui/card'; // Added Card, CardContent
 
 export default function Home() {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
@@ -133,9 +134,19 @@ export default function Home() {
             currentUserEmail={currentUser?.email || null}
             currentUserDisplayName={currentUserProfile?.fullName || currentUser?.displayName || null}
             currentUserUid={currentUser?.uid || null}
-            currentUserProfile={currentUserProfile} // Pass the full profile
+            currentUserProfile={currentUserProfile} 
             onPaymentSuccess={handleClearSelections}
           />
+          <Card className="shadow-lg rounded-lg">
+            <CardContent className="p-4 text-sm text-muted-foreground">
+              <div className="flex items-start gap-2">
+                <Mail className="h-5 w-5 mt-0.5 text-primary flex-shrink-0" />
+                <p>
+                  Share your queries or feedback on <a href="mailto:messcaptainiiitbbsr@gmail.com" className="font-medium text-primary hover:underline">messcaptainiiitbbsr@gmail.com</a>
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </main>
 
@@ -145,4 +156,3 @@ export default function Home() {
     </div>
   );
 }
-
