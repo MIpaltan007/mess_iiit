@@ -22,7 +22,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { app } from '@/services/firebase';
-import { saveUserProfile, UserRole, checkIfAdminExists } from '@/services/userService'; // Changed import
+import { saveUserProfile, UserRole, checkIfAdminExists } from '@/services/userService'; 
 
 const ROLES: UserRole[] = ['Student', 'Admin', 'Staff'];
 
@@ -81,6 +81,18 @@ export default function RegisterPage() {
       }
     }
 
+    // Student email validation
+    if (values.role === 'Student' && !values.email.toLowerCase().endsWith('@iiit-bh.ac.in')) {
+      toast({
+        title: 'Invalid Email for Student',
+        description: 'Register using your college mail-id (ending with @iiit-bh.ac.in).',
+        variant: 'destructive',
+        duration: 7000,
+      });
+      form.setError('email', { type: 'manual', message: 'Students must use college email ending with @iiit-bh.ac.in' });
+      return;
+    }
+
     const auth = getAuth(app);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
@@ -98,7 +110,7 @@ export default function RegisterPage() {
             email: values.email,
             fullName: values.fullName,
             role: values.role,
-            joinDate: new Date().toISOString(), // Add joinDate for consistency if needed elsewhere
+            joinDate: new Date().toISOString(), 
         });
       }
 
@@ -230,4 +242,3 @@ export default function RegisterPage() {
     </div>
   );
 }
-
