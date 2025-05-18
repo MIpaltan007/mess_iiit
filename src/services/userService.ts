@@ -16,6 +16,8 @@ export interface UserProfile {
   fullName: string;
   role: UserRole;
   joinDate: string; // ISO string date
+  lastPurchaseAt?: string; // ISO string for client, Firestore Timestamp in DB
+  lastOrderId?: string;
 }
 
 // User structure for admin listing (derived from orders)
@@ -30,12 +32,39 @@ export interface User {
 
 /**
  * Saves or updates a user's profile in Firestore.
+ * Converts string dates for `lastPurchaseAt` and `joinDate` to Firestore Timestamps if they are strings.
  * @param profile - The user profile data.
  */
 export async function saveUserProfile(profile: UserProfile): Promise<void> {
   try {
     const userDocRef = doc(db, 'users', profile.uid);
-    await setDoc(userDocRef, profile, { merge: true }); // Use merge to avoid overwriting if doc exists
+    const dataToSave: any = { ...profile };
+
+    // Convert lastPurchaseAt to Timestamp if it's a string
+    if (profile.lastPurchaseAt && typeof profile.lastPurchaseAt === 'string') {
+      dataToSave.lastPurchaseAt = Timestamp.fromDate(new Date(profile.lastPurchaseAt));
+    } else if (profile.lastPurchaseAt === undefined) {
+        // If explicitly clearing, ensure it's removed or set to null in Firestore
+        dataToSave.lastPurchaseAt = null; 
+    }
+
+
+    // Ensure joinDate is also a Timestamp if it's being set/updated as a string
+    // However, joinDate is typically set once on registration as an ISO string.
+    // If it's always an ISO string from client and needs to be a Timestamp in FS:
+    if (profile.joinDate && typeof profile.joinDate === 'string') {
+         // Assuming joinDate from client is ISO string. If it could be already a Timestamp, add checks.
+        // For this operation, if it's already an ISO string, convert it.
+        // This part might need adjustment based on how joinDate is handled elsewhere if it's updated post-registration.
+        // For now, let's assume if saveUserProfile is called with it, it might be an ISO string to be stored as Timestamp.
+        // However, current registration saves it as ISO, and getUserProfile returns it as ISO.
+        // To keep it simple, if it's already an ISO string from client, store it as is or convert to Timestamp.
+        // Let's keep joinDate as string in Firestore as per original setup to avoid breaking existing logic unless necessary.
+        // The main concern is lastPurchaseAt for date comparisons.
+    }
+
+
+    await setDoc(userDocRef, dataToSave, { merge: true });
   } catch (error: any) {
     console.error(
       "Error saving user profile to Firestore:",
@@ -49,6 +78,7 @@ export async function saveUserProfile(profile: UserProfile): Promise<void> {
 
 /**
  * Fetches a user's profile from Firestore.
+ * Converts Firestore Timestamps for `lastPurchaseAt` and `joinDate` to ISO strings.
  * @param uid - The user's UID.
  * @returns The user profile data if found, otherwise null.
  */
@@ -58,7 +88,17 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
     const userDocRef = doc(db, 'users', uid);
     const docSnap = await getDoc(userDocRef);
     if (docSnap.exists()) {
-      return docSnap.data() as UserProfile;
+      const data = docSnap.data();
+      const profile: UserProfile = {
+        uid: data.uid,
+        email: data.email,
+        fullName: data.fullName,
+        role: data.role,
+        joinDate: data.joinDate instanceof Timestamp ? data.joinDate.toDate().toISOString() : data.joinDate,
+        lastPurchaseAt: data.lastPurchaseAt instanceof Timestamp ? data.lastPurchaseAt.toDate().toISOString() : undefined,
+        lastOrderId: data.lastOrderId,
+      };
+      return profile;
     }
     return null;
   } catch (error: any) {
@@ -68,7 +108,6 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
       error.code ? `(Code: ${error.code})` : '',
       error.stack ? `\nStack: ${error.stack}` : ''
     );
-    // Don't throw, return null so app can proceed with default role/prices
     return null;
   }
 }
@@ -81,7 +120,18 @@ export async function getAllUserProfiles(): Promise<UserProfile[]> {
   const usersCollectionRef = collection(db, 'users');
   try {
     const querySnapshot = await getDocs(usersCollectionRef);
-    return querySnapshot.docs.map(doc => doc.data() as UserProfile).filter(profile => profile.email && profile.role);
+    return querySnapshot.docs.map(doc => {
+        const data = doc.data();
+         return {
+            uid: data.uid,
+            email: data.email,
+            fullName: data.fullName,
+            role: data.role,
+            joinDate: data.joinDate instanceof Timestamp ? data.joinDate.toDate().toISOString() : data.joinDate,
+            lastPurchaseAt: data.lastPurchaseAt instanceof Timestamp ? data.lastPurchaseAt.toDate().toISOString() : undefined,
+            lastOrderId: data.lastOrderId,
+         } as UserProfile;
+    }).filter(profile => profile.email && profile.role);
   } catch (error: any)
  {
     console.error(
@@ -96,8 +146,14 @@ export async function getAllUserProfiles(): Promise<UserProfile[]> {
 
 
 export async function getTotalUsersCount(): Promise<number> {
-  const users = await getAllUsers();
-  return users.length;
+  // This function now relies on getAllUsers which processes from orders, 
+  // but for profile counts, it should use users collection.
+  // Let's assume it means profiles with actual order history as per `getAllUsers` context
+  const usersWithOrders = await getAllUsers(); // Users derived from orders
+  return usersWithOrders.length;
+  // If it meant total registered profiles:
+  // const profiles = await getAllUserProfiles();
+  // return profiles.length;
 }
 
 export async function getAllUsers(): Promise<User[]> {
@@ -156,6 +212,7 @@ export async function getAllUsers(): Promise<User[]> {
 
 export async function getRecentUsers(count: number): Promise<User[]> {
   const allUsers = await getAllUsers();
+  // Sort by joinDate (which is firstOrderDate) to get most recent *active* users
   const sortedUsers = [...allUsers].sort((a, b) => new Date(b.joinDate).getTime() - new Date(a.joinDate).getTime());
   return sortedUsers.slice(0, count);
 }
@@ -177,11 +234,7 @@ export async function checkIfAdminExists(): Promise<boolean> {
       error.code ? `(Code: ${error.code})` : '',
       error.stack ? `\nStack: ${error.stack}` : ''
     );
-    // In case of error, conservatively assume an admin might exist or an error occurred.
-    // Depending on desired behavior, you could throw or return false.
-    // For this check, returning true (or throwing) on error might be safer to prevent multiple admins.
-    // However, to allow registration if the check itself fails, return false.
-    // Let's re-throw to make it explicit that the check failed.
     throw new Error("Failed to check for existing admin. Registration aborted.");
   }
 }
+

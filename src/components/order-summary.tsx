@@ -6,43 +6,85 @@ import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { ShoppingCart, CreditCard, CheckCircle, Trash2, ExternalLink } from 'lucide-react';
+import { ShoppingCart, CreditCard, CheckCircle, Trash2, ExternalLink, Info } from 'lucide-react';
 import { processPayment, type PaymentInfo, type PaymentResult } from '@/services/payment';
 import { sendNotification, type Notification as NotificationType } from '@/services/notification';
 import { saveOrder, type OrderData } from '@/services/orderService';
-import { createCouponForOrder } from '@/services/couponService'; // Import createCouponForOrder
+import { createCouponForOrder } from '@/services/couponService';
 import Link from 'next/link';
 import type { MenuItem } from './menu-display';
+import type { UserProfile } from '@/services/userService'; // Import UserProfile
+import { saveUserProfile } from '@/services/userService'; // Import saveUserProfile
 
 interface OrderSummaryProps {
   selectedMeals: MenuItem[];
   currentUserEmail: string | null;
   currentUserDisplayName: string | null;
-  currentUserUid: string | null; // Added currentUserUid
-  onPaymentSuccess: () => void; // Callback to clear selections in parent
+  currentUserUid: string | null;
+  currentUserProfile: UserProfile | null; // Added currentUserProfile
+  onPaymentSuccess: () => void;
 }
 
-export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUserEmail, currentUserDisplayName, currentUserUid, onPaymentSuccess }) => {
+export const OrderSummary: FC<OrderSummaryProps> = ({
+  selectedMeals,
+  currentUserEmail,
+  currentUserDisplayName,
+  currentUserUid,
+  currentUserProfile,
+  onPaymentSuccess,
+}) => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [orderId, setOrderId] = useState<string | null>(null);
+  const [orderId, setOrderId] = useState<string | null>(null); // For newly created order
   const { toast } = useToast();
 
-  const totalCost = useMemo(() => {
-    return selectedMeals.reduce((sum, meal) => sum + meal.price, 0);
-  }, [selectedMeals]);
+  const [isStudentRestricted, setIsStudentRestricted] = useState(false);
+  const [studentNextPurchaseDate, setStudentNextPurchaseDate] = useState<string | null>(null);
+  const [studentExistingOrderLink, setStudentExistingOrderLink] = useState<string | null>(null);
 
   const orderDetailsLink = useMemo(() => {
-    if (orderId && typeof window !== 'undefined') {
+    if (orderId && typeof window !== 'undefined') { // Link for NEWLY created order
       return `${window.location.origin}/order-details/${orderId}`;
     }
     return null;
   }, [orderId]);
 
+  // Effect to check student restriction status
   useEffect(() => {
-    if (selectedMeals.length === 0 && !isLoading && !orderDetailsLink) { // Only clear orderId if not loading and link not already generated
+    if (currentUserProfile?.role === 'Student' && currentUserProfile.lastPurchaseAt && currentUserProfile.lastOrderId) {
+      const lastPurchaseDate = new Date(currentUserProfile.lastPurchaseAt);
+      const sevenDaysAfterPurchase = new Date(lastPurchaseDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const now = new Date();
+
+      if (now < sevenDaysAfterPurchase) {
+        setIsStudentRestricted(true);
+        setStudentNextPurchaseDate(sevenDaysAfterPurchase.toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' }));
+        if (typeof window !== 'undefined') {
+          setStudentExistingOrderLink(`${window.location.origin}/order-details/${currentUserProfile.lastOrderId}`);
+        }
+        setOrderId(null); // Clear any new order link state if student is restricted
+      } else {
+        setIsStudentRestricted(false);
+        setStudentNextPurchaseDate(null);
+        setStudentExistingOrderLink(null);
+      }
+    } else {
+      setIsStudentRestricted(false);
+      setStudentNextPurchaseDate(null);
+      setStudentExistingOrderLink(null);
+    }
+  }, [currentUserProfile]);
+
+  // Effect to clear new orderId if selections are empty AND student is not restricted
+   useEffect(() => {
+    if (selectedMeals.length === 0 && !isLoading && !orderDetailsLink && !isStudentRestricted) {
       setOrderId(null);
     }
-  }, [selectedMeals, isLoading, orderDetailsLink]);
+  }, [selectedMeals, isLoading, orderDetailsLink, isStudentRestricted]);
+
+
+  const totalCost = useMemo(() => {
+    return selectedMeals.reduce((sum, meal) => sum + meal.price, 0);
+  }, [selectedMeals]);
 
 
   const handleProceedToPayment = async () => {
@@ -55,7 +97,7 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
       return;
     }
 
-    if (!currentUserEmail || !currentUserUid) { // Also check for currentUserUid
+    if (!currentUserEmail || !currentUserUid) {
         toast({
             title: 'Not Logged In',
             description: 'Please log in to proceed with your order.',
@@ -63,6 +105,24 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
             action: <Link href="/auth/login"><Button variant="outline" size="sm">Login</Button></Link>
         });
         return;
+    }
+
+    // Student restriction check before payment attempt
+    if (currentUserProfile?.role === 'Student') {
+        if (currentUserProfile.lastPurchaseAt) {
+            const lastPurchaseDate = new Date(currentUserProfile.lastPurchaseAt);
+            const sevenDaysAfterPurchase = new Date(lastPurchaseDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+            const now = new Date();
+            if (now < sevenDaysAfterPurchase) {
+                toast({
+                    title: "Purchase Limit Reached",
+                    description: `Students can purchase meals once a week. Your next purchase is available after ${sevenDaysAfterPurchase.toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' })}.`,
+                    variant: "destructive",
+                    duration: 7000,
+                });
+                return; 
+            }
+        }
     }
 
     setIsLoading(true);
@@ -84,24 +144,37 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
         const newOrderId = await saveOrder(orderDataForDb);
         setOrderId(newOrderId); 
         
-        // Create a coupon for this order
         try {
           await createCouponForOrder(newOrderId, currentUserUid);
-          toast({
-            title: 'Payment Successful & Order Link Generated!',
-            description: `Order link for ${newOrderId} is ready. A new coupon has been created. Transaction ID: ${paymentResult.transactionId}.`,
-            action: <CheckCircle className="text-green-500" />,
-          });
         } catch (couponError) {
           console.error("Failed to create coupon for order:", newOrderId, couponError);
-          toast({ // Inform user about order success, but coupon creation issue
-            title: 'Payment Successful & Order Link Generated!',
-            description: `Order link for ${newOrderId} is ready. Transaction ID: ${paymentResult.transactionId}. (Note: Coupon creation failed, please contact support if needed)`,
-            variant: "default", // Keep it default as order was successful
-            duration: 7000,
-            action: <CheckCircle className="text-green-500" />,
-          });
         }
+        
+        // Update student's last purchase info
+        if (currentUserProfile?.role === 'Student') {
+            const updatedProfileData: UserProfile = {
+                ...currentUserProfile, // spread existing profile data
+                uid: currentUserUid,    // ensure uid is present
+                email: currentUserEmail, // ensure email is present
+                fullName: currentUserDisplayName || currentUserProfile.fullName || '', // ensure fullName
+                // joinDate is already part of currentUserProfile and should persist
+                lastPurchaseAt: new Date().toISOString(),
+                lastOrderId: newOrderId,
+            };
+            try {
+                await saveUserProfile(updatedProfileData);
+            } catch (profileError) {
+                console.error("Failed to update student's last purchase time:", profileError);
+                // Non-critical error, order still placed. Inform user.
+                toast({ title: "Order Placed", description: `Order ${newOrderId} successful, but failed to update your purchase record. Please contact support if issues persist.`, variant: "default", duration: 10000 });
+            }
+        }
+
+        toast({
+            title: 'Payment Successful & Order Link Generated!',
+            description: `Order link for ${newOrderId} is ready. Transaction ID: ${paymentResult.transactionId}. A new coupon has been created.`,
+            action: <CheckCircle className="text-green-500" />,
+        });
         
         const mealNames = selectedMeals.map(m => m.name).join(', ');
         const notification: NotificationType = {
@@ -135,6 +208,44 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
       setIsLoading(false);
     }
   };
+
+  const handleClearAndReset = () => {
+    onPaymentSuccess(); // Clears selected meals in parent
+    setOrderId(null); // Clears the new order link
+    // If a student was restricted, clearing selections shouldn't lift the restriction.
+    // The restriction is lifted by time or if their profile changes.
+  };
+
+
+  if (isStudentRestricted && studentExistingOrderLink) {
+    return (
+      <Card className="shadow-lg rounded-lg">
+        <CardHeader>
+          <CardTitle className="text-xl font-semibold text-primary flex items-center gap-2">
+            <Info className="h-6 w-6" />
+            Weekly Meal Order Status
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-center">
+            <p className="text-foreground font-medium">You have an active meal order for this week.</p>
+            <a 
+              href={studentExistingOrderLink} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="inline-flex items-center justify-center gap-1.5 text-primary underline font-medium hover:text-primary/80 break-all"
+            >
+              <ExternalLink className="h-4 w-4"/> View Your Current Order
+            </a>
+            {studentNextPurchaseDate && (
+                 <p className="text-sm text-muted-foreground">
+                    You can purchase new meals after {studentNextPurchaseDate}.
+                </p>
+            )}
+        </CardContent>
+      </Card>
+    );
+  }
+
 
   return (
     <Card className="shadow-lg rounded-lg">
@@ -197,10 +308,7 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
               {isLoading ? 'Processing...' : `Pay ₹${totalCost.toFixed(2)} & Get Details Link`}
             </Button>
              <Button 
-              onClick={() => {
-                onPaymentSuccess(); 
-                setOrderId(null);   
-              }}
+              onClick={handleClearAndReset}
               variant="outline" 
               className="w-full"
               disabled={isLoading}
@@ -213,7 +321,7 @@ export const OrderSummary: FC<OrderSummaryProps> = ({ selectedMeals, currentUser
         </CardFooter>
       )}
 
-       {!currentUserEmail && !orderDetailsLink && selectedMeals.length > 0 && (
+       {!currentUserEmail && !orderDetailsLink && !isStudentRestricted && selectedMeals.length > 0 && (
          <CardFooter className="pt-4 border-t">
             <p className="text-sm text-center text-muted-foreground w-full">
                 Please <Link href="/auth/login" className="underline text-primary font-medium">log in</Link> to complete your purchase.

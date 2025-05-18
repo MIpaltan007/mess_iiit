@@ -11,11 +11,11 @@ import { getAuth, onAuthStateChanged, signOut, type User as FirebaseUser } from 
 import { app } from '@/services/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { getUserProfile, type UserProfile } from '@/services/userService'; // Import UserProfile
+import { getUserProfile, type UserProfile } from '@/services/userService'; 
 
 export default function Home() {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
-  const [currentUserProfile, setCurrentUserProfile] = useState<UserProfile | null>(null); // For role and other details
+  const [currentUserProfile, setCurrentUserProfile] = useState<UserProfile | null>(null);
   const [selectedMeals, setSelectedMeals] = useState<DisplayMenuItem[]>([]);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const { toast } = useToast();
@@ -31,11 +31,11 @@ export default function Home() {
           setCurrentUserProfile(profile);
         } catch (error) {
           console.error("Failed to fetch user profile:", error);
-          setCurrentUserProfile(null); // Reset profile on error
+          setCurrentUserProfile(null); 
         }
       } else {
         setSelectedMeals([]);
-        setCurrentUserProfile(null); // Clear profile on logout
+        setCurrentUserProfile(null); 
       }
       setIsLoadingAuth(false);
     });
@@ -48,7 +48,7 @@ export default function Home() {
       await signOut(auth);
       toast({ title: 'Logged Out', description: 'You have been successfully logged out.' });
       setSelectedMeals([]); 
-      setCurrentUserProfile(null); // Clear profile on logout
+      setCurrentUserProfile(null); 
       router.push('/'); 
     } catch (error) {
       console.error('Logout failed:', error);
@@ -122,7 +122,7 @@ export default function Home() {
         <div className="md:col-span-2">
           <MenuDisplay 
             currentUser={currentUser} 
-            currentUserProfile={currentUserProfile} // Pass profile here
+            currentUserProfile={currentUserProfile}
             onMealSelect={handleMealSelect}
             selectedMeals={selectedMeals}
           />
@@ -132,7 +132,8 @@ export default function Home() {
             selectedMeals={selectedMeals}
             currentUserEmail={currentUser?.email || null}
             currentUserDisplayName={currentUserProfile?.fullName || currentUser?.displayName || null}
-            currentUserUid={currentUser?.uid || null} // Pass UID here
+            currentUserUid={currentUser?.uid || null}
+            currentUserProfile={currentUserProfile} // Pass the full profile
             onPaymentSuccess={handleClearSelections}
           />
         </div>
@@ -144,3 +145,4 @@ export default function Home() {
     </div>
   );
 }
+
