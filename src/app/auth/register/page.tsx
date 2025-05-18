@@ -22,7 +22,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { app } from '@/services/firebase';
-import { saveUserProfile, UserRole } from '@/services/userService'; // Changed import
+import { saveUserProfile, UserRole, checkIfAdminExists } from '@/services/userService'; // Changed import
 
 const ROLES: UserRole[] = ['Student', 'Admin', 'Staff'];
 
@@ -55,6 +55,32 @@ export default function RegisterPage() {
   });
 
   async function onSubmit(values: RegisterFormValues) {
+    form.clearErrors(); // Clear previous errors
+
+    if (values.role === 'Admin') {
+      try {
+        const adminExists = await checkIfAdminExists();
+        if (adminExists) {
+          toast({
+            title: 'Registration Prevented',
+            description: 'An Admin account already exists. Only one Admin can be registered. Please choose a different role or contact support.',
+            variant: 'destructive',
+            duration: 7000,
+          });
+          form.setError('role', { type: 'manual', message: 'Admin already registered.' });
+          return;
+        }
+      } catch (error: any) {
+        console.error('Error checking for existing admin:', error);
+        toast({
+          title: 'Registration Error',
+          description: 'Could not verify admin status. Please try again.',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
     const auth = getAuth(app);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
@@ -204,3 +230,4 @@ export default function RegisterPage() {
     </div>
   );
 }
+

@@ -2,7 +2,7 @@
 // src/services/userService.ts
 'use server';
 
-import { collection, getDocs, query, orderBy, Timestamp, doc, setDoc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, Timestamp, doc, setDoc, getDoc, where, limit } from 'firebase/firestore';
 import { db } from './firebase';
 import type { OrderData } from './orderService';
 
@@ -158,4 +158,30 @@ export async function getRecentUsers(count: number): Promise<User[]> {
   const allUsers = await getAllUsers();
   const sortedUsers = [...allUsers].sort((a, b) => new Date(b.joinDate).getTime() - new Date(a.joinDate).getTime());
   return sortedUsers.slice(0, count);
+}
+
+/**
+ * Checks if an admin user already exists in the 'users' collection.
+ * @returns Promise<boolean> - True if an admin exists, false otherwise.
+ */
+export async function checkIfAdminExists(): Promise<boolean> {
+  const usersCollectionRef = collection(db, 'users');
+  const adminQuery = query(usersCollectionRef, where('role', '==', 'Admin'), limit(1));
+  try {
+    const querySnapshot = await getDocs(adminQuery);
+    return !querySnapshot.empty; // If snapshot is not empty, an admin exists
+  } catch (error: any) {
+    console.error(
+      "Error checking for existing admin:",
+      error.message,
+      error.code ? `(Code: ${error.code})` : '',
+      error.stack ? `\nStack: ${error.stack}` : ''
+    );
+    // In case of error, conservatively assume an admin might exist or an error occurred.
+    // Depending on desired behavior, you could throw or return false.
+    // For this check, returning true (or throwing) on error might be safer to prevent multiple admins.
+    // However, to allow registration if the check itself fails, return false.
+    // Let's re-throw to make it explicit that the check failed.
+    throw new Error("Failed to check for existing admin. Registration aborted.");
+  }
 }
