@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { UtensilsCrossed, LogIn } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation'; // Import useSearchParams
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { app } from '@/services/firebase';
 
@@ -32,6 +32,7 @@ type LoginFormValues = z.infer<typeof loginFormSchema>;
 export default function LoginPage() {
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams(); // Get search params
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
@@ -44,17 +45,22 @@ export default function LoginPage() {
   async function onSubmit(values: LoginFormValues) {
     const auth = getAuth(app);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
-      // const user = userCredential.user;
+      await signInWithEmailAndPassword(auth, values.email, values.password);
+      // const user = userCredential.user; // user object available if needed
       toast({ title: 'Login Successful!', description: 'Welcome back!' });
-      // Check if the user is an admin (e.g. by email) and redirect accordingly
-      if (values.email === process.env.NEXT_PUBLIC_ADMIN_EMAIL) { // Example admin check
+
+      const redirectUrl = searchParams.get('redirect'); // Check for redirect query param
+
+      if (redirectUrl) {
+        router.push(redirectUrl); // Redirect to the specified URL
+      } else if (values.email === process.env.NEXT_PUBLIC_ADMIN_EMAIL) { 
+        // Fallback: if admin email matches (can be removed if AdminLayout is sole gatekeeper)
         router.push('/admin');
       } else {
         router.push('/'); 
       }
     } catch (error: any) {
-      let errorMessage = 'An unexpected error occurred. Please try again.'; // Default user-facing message
+      let errorMessage = 'An unexpected error occurred. Please try again.';
       let logMessage = `Login Failed: ${error.message || 'Unknown error'}`;
       let logLevel: 'error' | 'warn' = 'error';
 
@@ -71,14 +77,13 @@ export default function LoginPage() {
         errorMessage = 'Network error. Please check your connection.';
         logMessage = `Login Failed - Network Error: (Code: ${error.code}) ${error.message}`;
       } else {
-        // For other unexpected errors, use the default errorMessage and log full error.
         logMessage = `Login Failed - Unexpected Error: (Code: ${error.code || 'N/A'}) ${error.message || 'Unknown error'}`;
       }
 
       if (logLevel === 'error') {
-        console.error(logMessage, error); // Log the full error object for unexpected errors for more debug info.
+        console.error(logMessage, error); 
       } else {
-        console.warn(logMessage); // Log expected user errors as warnings.
+        console.warn(logMessage); 
       }
       
       toast({ title: 'Login Failed', description: errorMessage, variant: 'destructive' });
@@ -131,7 +136,6 @@ export default function LoginPage() {
           </Form>
         </CardContent>
         <CardFooter className="flex flex-col items-center space-y-2">
-          {/* Removed "Forgot password" link */}
           <p className="text-sm text-muted-foreground">
             Don&apos;t have an account?{' '}
             <Link href="/auth/register" legacyBehavior>
