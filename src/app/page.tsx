@@ -119,8 +119,8 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="flex-grow container mx-auto px-4 py-8 grid md:grid-cols-2 gap-8">
-        <div className="md:col-span-1"> {/* Adjusted from md:col-span-2 */}
+      <main className="flex-grow container mx-auto px-4 py-8 grid md:grid-cols-3 gap-8">
+        <div className="md:col-span-2">
           <MenuDisplay 
             currentUser={currentUser} 
             currentUserProfile={currentUserProfile}
@@ -138,7 +138,7 @@ export default function Home() {
             onPaymentSuccess={handleClearSelections}
           />
           <Card className="shadow-lg rounded-lg">
-            <CardContent className="p-4 text-xs text-muted-foreground"> {/* Changed text-sm to text-xs */}
+            <CardContent className="p-4 text-xs text-muted-foreground">
               <div className="flex items-start gap-2">
                 <Mail className="h-5 w-5 mt-0.5 text-primary flex-shrink-0" />
                 <p className="break-words">
