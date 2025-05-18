@@ -141,7 +141,7 @@ export default function Home() {
             <CardContent className="p-4 text-sm text-muted-foreground">
               <div className="flex items-start gap-2">
                 <Mail className="h-5 w-5 mt-0.5 text-primary flex-shrink-0" />
-                <p>
+                <p className="break-words"> {/* Added break-words class here */}
                   Share your queries or feedback on <a href="mailto:messcaptainiiitbbsr@gmail.com" className="font-medium text-primary hover:underline">messcaptainiiitbbsr@gmail.com</a>
                 </p>
               </div>
