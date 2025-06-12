@@ -136,6 +136,7 @@ export const OrderSummary: FC<OrderSummaryProps> = ({
 
       if (paymentResult.success) {
         const orderDataForDb: Omit<OrderData, 'id' | 'createdAt'> = {
+          userId: currentUserUid, // Ensure userId is included
           userEmail: currentUserEmail,
           userName: currentUserDisplayName || undefined,
           selectedMeals: selectedMeals,
@@ -153,11 +154,10 @@ export const OrderSummary: FC<OrderSummaryProps> = ({
         // Update student's last purchase info
         if (currentUserProfile?.role === 'Student') {
             const updatedProfileData: UserProfile = {
-                ...currentUserProfile, // spread existing profile data
-                uid: currentUserUid,    // ensure uid is present
-                email: currentUserEmail, // ensure email is present
-                fullName: currentUserDisplayName || currentUserProfile.fullName || '', // ensure fullName
-                // joinDate is already part of currentUserProfile and should persist
+                ...currentUserProfile, 
+                uid: currentUserUid,    
+                email: currentUserEmail, 
+                fullName: currentUserDisplayName || currentUserProfile.fullName || '', 
                 lastPurchaseAt: new Date().toISOString(),
                 lastOrderId: newOrderId,
             };
@@ -165,7 +165,6 @@ export const OrderSummary: FC<OrderSummaryProps> = ({
                 await saveUserProfile(updatedProfileData);
             } catch (profileError) {
                 console.error("Failed to update student's last purchase time:", profileError);
-                // Non-critical error, order still placed. Inform user.
                 toast({ title: "Order Placed", description: `Order ${newOrderId} successful, but failed to update your purchase record. Please contact support if issues persist.`, variant: "default", duration: 10000 });
             }
         }
@@ -212,8 +211,6 @@ export const OrderSummary: FC<OrderSummaryProps> = ({
   const handleClearAndReset = () => {
     onPaymentSuccess(); // Clears selected meals in parent
     setOrderId(null); // Clears the new order link
-    // If a student was restricted, clearing selections shouldn't lift the restriction.
-    // The restriction is lifted by time or if their profile changes.
   };
 
 

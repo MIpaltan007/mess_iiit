@@ -7,6 +7,7 @@ import { db } from './firebase';
 
 export interface OrderData {
   id?: string; // Firestore document ID, added after fetching
+  userId: string; // Firebase UID of the user who placed the order
   userEmail: string;
   userName?: string; // User's display name
   selectedMeals: MenuItem[];
@@ -18,13 +19,16 @@ const ordersCollection = collection(db, 'orders');
 
 /**
  * Saves an order to Firestore.
- * @param orderData - The order details to save. Includes userEmail, selectedMeals, totalCost, and optionally userName.
+ * @param orderData - The order details to save. Includes userId, userEmail, selectedMeals, totalCost, and optionally userName.
  * @returns The ID of the newly created order document.
  */
 export async function saveOrder(orderData: Omit<OrderData, 'id' | 'createdAt'>): Promise<string> {
   try {
+    if (!orderData.userId) {
+        throw new Error("User ID is missing from order data. Cannot save order.");
+    }
     const orderToSave = {
-      ...orderData, // This will include userEmail, selectedMeals, totalCost, and userName if provided
+      ...orderData, // This will include userId, userEmail, selectedMeals, totalCost, and userName if provided
       createdAt: Timestamp.now(),
     };
     const docRef = await addDoc(ordersCollection, orderToSave);
@@ -43,7 +47,7 @@ export async function saveOrder(orderData: Omit<OrderData, 'id' | 'createdAt'>):
 /**
  * Retrieves a specific order from Firestore by its ID.
  * @param orderId - The ID of the order to retrieve.
- * @returns The order data (including userName if saved) if found, otherwise null.
+ * @returns The order data (including userName and userId if saved) if found, otherwise null.
  */
 export async function getOrderById(orderId: string): Promise<OrderData | null> {
   try {
@@ -55,12 +59,12 @@ export async function getOrderById(orderId: string): Promise<OrderData | null> {
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
-      // Ensure the data conforms to OrderData, especially the optional userName
       const data = docSnap.data();
       return { 
         id: docSnap.id, 
+        userId: data.userId, // Include userId
         userEmail: data.userEmail,
-        userName: data.userName, // This will be undefined if not set, which is fine for optional field
+        userName: data.userName, 
         selectedMeals: data.selectedMeals,
         totalCost: data.totalCost,
         createdAt: data.createdAt,
@@ -79,3 +83,4 @@ export async function getOrderById(orderId: string): Promise<OrderData | null> {
     throw new Error(`Could not fetch order details for ID: ${orderId}. Check server logs for details.`);
   }
 }
+
